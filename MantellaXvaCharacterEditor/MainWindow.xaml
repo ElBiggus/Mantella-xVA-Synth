@@ -17,6 +17,8 @@
         <Menu DockPanel.Dock="Top">
             <MenuItem Header="_File">
                 <MenuItem Header="Set xVA-Synth folder" Click="SetXvaSynthFolderMenuItem_Click" />
+                <MenuItem Header="Preview invalid voice model fixes..." Click="PreviewInvalidVoiceModelsMenuItem_Click" />
+                <MenuItem Header="Fix invalid voice models..." Click="FixInvalidVoiceModelsMenuItem_Click" />
                 <Separator />
                 <MenuItem Header="Quit" Click="QuitMenuItem_Click" />
             </MenuItem>
@@ -31,18 +33,67 @@
 
             <Grid Grid.Column="0" Margin="10">
                 <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
                     <RowDefinition Height="*" />
                     <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
 
+                <StackPanel Grid.Row="0" Margin="0,0,0,8" Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBlock VerticalAlignment="Center" Margin="0,0,10,0" Text="Has override?" />
+                    <RadioButton x:Name="HasOverrideAllRadioButton"
+                                 GroupName="HasOverrideFilter"
+                                 Content="All"
+                                 Margin="0,0,10,0"
+                                 IsChecked="True"
+                                 Checked="HasOverrideFilterRadioButton_Checked" />
+                    <RadioButton x:Name="HasOverrideYesRadioButton"
+                                 GroupName="HasOverrideFilter"
+                                 Content="Yes"
+                                 Margin="0,0,10,0"
+                                 Checked="HasOverrideFilterRadioButton_Checked" />
+                    <RadioButton x:Name="HasOverrideNoRadioButton"
+                                 GroupName="HasOverrideFilter"
+                                 Content="No"
+                                 Checked="HasOverrideFilterRadioButton_Checked" />
+                </StackPanel>
+
+                <StackPanel Grid.Row="1" Margin="0,0,0,8" Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBlock VerticalAlignment="Center" Margin="0,0,10,0" Text="Valid voice model?" />
+                    <RadioButton x:Name="ValidVoiceModelAllRadioButton"
+                                 GroupName="ValidVoiceModelFilter"
+                                 Content="All"
+                                 Margin="0,0,10,0"
+                                 IsChecked="True"
+                                 Checked="ValidVoiceModelFilterRadioButton_Checked" />
+                    <RadioButton x:Name="ValidVoiceModelYesRadioButton"
+                                 GroupName="ValidVoiceModelFilter"
+                                 Content="Yes"
+                                 Margin="0,0,10,0"
+                                 Checked="ValidVoiceModelFilterRadioButton_Checked" />
+                    <RadioButton x:Name="ValidVoiceModelNoRadioButton"
+                                 GroupName="ValidVoiceModelFilter"
+                                 Content="No"
+                                 Checked="ValidVoiceModelFilterRadioButton_Checked" />
+                </StackPanel>
+
+                <StackPanel Grid.Row="2" Margin="0,0,0,10" Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBlock VerticalAlignment="Center" Margin="0,0,10,0" Text="Name" />
+                    <TextBox x:Name="NameFilterTextBox"
+                             MinWidth="120"
+                             VerticalAlignment="Center"
+                             TextChanged="NameFilterTextBox_TextChanged" />
+                </StackPanel>
+
                 <ListBox x:Name="CharacterListBox"
-                         Grid.Row="0"
+                         Grid.Row="3"
                          SelectionChanged="CharacterListBox_SelectionChanged"
                          ScrollViewer.VerticalScrollBarVisibility="Auto"
                          MinHeight="100" />
 
                 <Button x:Name="NewCharacterButton"
-                        Grid.Row="1"
+                        Grid.Row="4"
                         Margin="0,10,0,0"
                         Height="34"
                         Content="New character"
