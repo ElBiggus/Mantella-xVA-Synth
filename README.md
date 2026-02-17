@@ -9,7 +9,7 @@
 *Usage*
 * On the first run you will need to select your xVA-Synth or xTTS installation directory using *File > Set xVA-Synth folder* or *File > Set xTTS folder* and locating the exectuable file.
 * Use *Mode* to switch between *xVA Synth* and *xTTS*.
-* Select a character from the list on the left (with some filtering options; see below), and their bio and other details will be loaded. If you've already created an override for this character you can click the *Load existing override* button to load those details instead.
+* Select a character from the list on the left (with some filtering options; see below), and their bio and other details will be loaded. If you've already created an override for this character the details will be pulled from there, but you can click the *Load default* button to restore the original information.
 * Edit the character to your liking and click the *Save* button; this will create/update the character's Mantella override.
 
 
