@@ -1,0 +1,46 @@
+<Window x:Class="MantellaXvaCharacterEditor.VoiceModelFixPreviewDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Preview invalid voice model fixes"
+        Height="520"
+        Width="760"
+        MinHeight="360"
+        MinWidth="560"
+        WindowStartupLocation="CenterOwner"
+        ShowInTaskbar="False">
+    <Grid Margin="14">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <TextBlock x:Name="SummaryTextBlock"
+                   Grid.Row="0"
+                   Margin="0,0,0,10"
+                   TextWrapping="Wrap" />
+
+        <ListView x:Name="PreviewListView"
+                  Grid.Row="1"
+                  ScrollViewer.VerticalScrollBarVisibility="Auto"
+                  ScrollViewer.HorizontalScrollBarVisibility="Auto">
+            <ListView.View>
+                <GridView>
+                    <GridViewColumn Header="Character" Width="220" DisplayMemberBinding="{Binding CharacterName}" />
+                    <GridViewColumn Header="Current voice model" Width="220" DisplayMemberBinding="{Binding CurrentVoiceModel}" />
+                    <GridViewColumn Header="New voice model" Width="220" DisplayMemberBinding="{Binding NewVoiceModel}" />
+                </GridView>
+            </ListView.View>
+        </ListView>
+
+        <StackPanel Grid.Row="2"
+                    Orientation="Horizontal"
+                    HorizontalAlignment="Right"
+                    Margin="0,12,0,0">
+            <Button Width="100"
+                    Content="OK"
+                    IsDefault="True"
+                    Click="OkButton_Click" />
+        </StackPanel>
+    </Grid>
+</Window>

@@ -1,5 +1,6 @@
 ﻿using Microsoft.Win32;
 using Microsoft.VisualBasic.FileIO;
+using System.Diagnostics;
 using System.ComponentModel;
 using System.Globalization;
 using System.IO;
@@ -17,6 +18,9 @@ public partial class MainWindow : Window
     private const string VoiceModelFallbackLabel = "Set xVA Folder!";
     private const string SettingsFolderName = "MantellaXvaCharacterEditor";
     private const string SettingsFileName = "settings.json";
+    private const string FilterAllOptionLabel = "-- ALL --";
+    private const string NexusModsUrl = "https://www.nexusmods.com/skyrimspecialedition/mods/172719";
+    private const string GitHubUrl = "https://github.com/ElBiggus/Mantella-xVA-Synth";
     private const int NameColumnIndex = 0;
     private const int VoiceModelColumnIndex = 1;
     private const int BioColumnIndex = 2;
@@ -183,6 +187,7 @@ public partial class MainWindow : Window
             .OrderBy(value => value, StringComparer.CurrentCultureIgnoreCase)
             .ToList();
 
+        RefreshFilterDropdownValues();
         ApplyCharacterFilters();
 
         SpeciesComboBox.ItemsSource = _speciesValues;
@@ -303,12 +308,18 @@ public partial class MainWindow : Window
         var nameFilter = NameFilterTextBox.Text.Trim();
         var hasOverrideFilter = GetRadioFilterSelection(HasOverrideAllRadioButton, HasOverrideYesRadioButton);
         var validVoiceModelFilter = GetRadioFilterSelection(ValidVoiceModelAllRadioButton, ValidVoiceModelYesRadioButton);
+        var genderFilter = GetGenderFilterSelection();
+        var raceFilter = GetFilterDropdownValue(RaceFilterComboBox);
+        var speciesFilter = GetFilterDropdownValue(SpeciesFilterComboBox);
 
         var filteredCharacterNames = _allCharacters
             .Where(character =>
                 MatchesNameFilter(character.Name, nameFilter)
                 && MatchesHasOverrideFilter(character.Name, hasOverrideFilter)
-                && MatchesValidVoiceModelFilter(character.VoiceModel, validVoiceModelFilter))
+                && MatchesValidVoiceModelFilter(character.VoiceModel, validVoiceModelFilter)
+                && MatchesGenderFilter(character.Gender, genderFilter)
+                && MatchesExactFilter(character.Race, raceFilter)
+                && MatchesExactFilter(character.Species, speciesFilter))
             .Select(character => character.Name)
             .ToList();
 
@@ -334,10 +345,72 @@ public partial class MainWindow : Window
     {
         return NameFilterTextBox is not null
             && CharacterListBox is not null
+            && RaceFilterComboBox is not null
+            && SpeciesFilterComboBox is not null
             && HasOverrideAllRadioButton is not null
             && HasOverrideYesRadioButton is not null
             && ValidVoiceModelAllRadioButton is not null
-            && ValidVoiceModelYesRadioButton is not null;
+            && ValidVoiceModelYesRadioButton is not null
+            && GenderFilterAllRadioButton is not null
+            && GenderFilterFemaleRadioButton is not null
+            && GenderFilterMaleRadioButton is not null
+            && GenderFilterNoneRadioButton is not null;
+    }
+
+    private void RefreshFilterDropdownValues()
+    {
+        if (!AreFilterControlsReady())
+        {
+            return;
+        }
+
+        SetFilterDropdownValues(RaceFilterComboBox, _raceValues);
+        SetFilterDropdownValues(SpeciesFilterComboBox, _speciesValues);
+    }
+
+    private static void SetFilterDropdownValues(ComboBox comboBox, IReadOnlyList<string> values)
+    {
+        var selectedValue = comboBox.SelectedItem?.ToString();
+        var options = new List<string> { FilterAllOptionLabel };
+        options.AddRange(values);
+
+        comboBox.ItemsSource = options;
+
+        if (!string.IsNullOrWhiteSpace(selectedValue) && options.Contains(selectedValue, StringComparer.CurrentCultureIgnoreCase))
+        {
+            comboBox.SelectedItem = options.First(option => string.Equals(option, selectedValue, StringComparison.CurrentCultureIgnoreCase));
+            return;
+        }
+
+        comboBox.SelectedIndex = 0;
+    }
+
+    private string GetFilterDropdownValue(ComboBox comboBox)
+    {
+        var selectedValue = comboBox.SelectedItem?.ToString();
+        return string.Equals(selectedValue, FilterAllOptionLabel, StringComparison.CurrentCultureIgnoreCase)
+            ? string.Empty
+            : selectedValue ?? string.Empty;
+    }
+
+    private GenderFilterSelection GetGenderFilterSelection()
+    {
+        if (GenderFilterFemaleRadioButton.IsChecked == true)
+        {
+            return GenderFilterSelection.Female;
+        }
+
+        if (GenderFilterMaleRadioButton.IsChecked == true)
+        {
+            return GenderFilterSelection.Male;
+        }
+
+        if (GenderFilterNoneRadioButton.IsChecked == true)
+        {
+            return GenderFilterSelection.None;
+        }
+
+        return GenderFilterSelection.All;
     }
 
     private static FilterSelection GetRadioFilterSelection(RadioButton allRadioButton, RadioButton yesRadioButton)
@@ -388,6 +461,27 @@ public partial class MainWindow : Window
             && _voiceModelNames.Contains(voiceModel);
 
         return validVoiceModelFilter == FilterSelection.Yes ? hasValidVoiceModel : !hasValidVoiceModel;
+    }
+
+    private static bool MatchesGenderFilter(string gender, GenderFilterSelection genderFilter)
+    {
+        return genderFilter switch
+        {
+            GenderFilterSelection.Female => string.Equals(gender, "Female", StringComparison.CurrentCultureIgnoreCase),
+            GenderFilterSelection.Male => string.Equals(gender, "Male", StringComparison.CurrentCultureIgnoreCase),
+            GenderFilterSelection.None => string.IsNullOrWhiteSpace(gender),
+            _ => true
+        };
+    }
+
+    private static bool MatchesExactFilter(string sourceValue, string filterValue)
+    {
+        if (string.IsNullOrWhiteSpace(filterValue))
+        {
+            return true;
+        }
+
+        return string.Equals(sourceValue, filterValue, StringComparison.CurrentCultureIgnoreCase);
     }
 
     private static List<string> GetVoiceModelNames(string? xvaDirectory)
@@ -452,27 +546,17 @@ public partial class MainWindow : Window
         }
 
         var candidates = BuildVoiceModelFixCandidates(models, csvByName, visibleCharacterNames, out var skippedCount);
-        var previewLines = candidates
-            .Take(12)
-            .Select(candidate => $"{candidate.CharacterName} -> {candidate.ResolvedVoiceModel}")
-            .ToList();
-
-        var message = $"Would update {candidates.Count} voice models";
+        var summaryMessage = $"Would update {candidates.Count} voice models";
         if (skippedCount > 0)
         {
-            message += $" and {skippedCount} entries wouldn't be updated";
+            summaryMessage += $" and {skippedCount} entries wouldn't be updated";
         }
 
-        if (previewLines.Count > 0)
-        {
-            message += ".\n\n" + string.Join("\n", previewLines);
-            if (candidates.Count > previewLines.Count)
-            {
-                message += "\n...";
-            }
-        }
+        var previewItems = candidates
+            .Select(candidate => new VoiceModelFixPreviewRow(candidate.CharacterName, candidate.CurrentVoiceModel, candidate.ResolvedVoiceModel))
+            .ToList();
 
-        MessageBox.Show(this, message, "Preview invalid voice model fixes", MessageBoxButton.OK, MessageBoxImage.Information);
+        VoiceModelFixPreviewDialog.Show(this, summaryMessage, previewItems);
     }
 
     private void FixInvalidVoiceModelsMenuItem_Click(object sender, RoutedEventArgs e)
@@ -592,7 +676,7 @@ public partial class MainWindow : Window
                 continue;
             }
 
-            candidates.Add(new VoiceModelFixCandidate(characterName, payload, resolvedModel));
+            candidates.Add(new VoiceModelFixCandidate(characterName, payload, payload.VoiceModel, resolvedModel));
         }
 
         return candidates;
@@ -960,6 +1044,21 @@ public partial class MainWindow : Window
         ApplyCharacterFilters();
     }
 
+    private void GenderFilterRadioButton_Checked(object sender, RoutedEventArgs e)
+    {
+        ApplyCharacterFilters();
+    }
+
+    private void RaceFilterComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        ApplyCharacterFilters();
+    }
+
+    private void SpeciesFilterComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        ApplyCharacterFilters();
+    }
+
     private CharacterFormData CaptureCurrentFormState()
     {
         return new CharacterFormData(
@@ -1021,6 +1120,32 @@ public partial class MainWindow : Window
     private void QuitMenuItem_Click(object sender, RoutedEventArgs e)
     {
         Close();
+    }
+
+    private void ViewOnNexusModsMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        OpenExternalUrl(NexusModsUrl);
+    }
+
+    private void ViewOnGitHubMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        OpenExternalUrl(GitHubUrl);
+    }
+
+    private void OpenExternalUrl(string url)
+    {
+        try
+        {
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = url,
+                UseShellExecute = true
+            });
+        }
+        catch
+        {
+            MessageBox.Show(this, "Unable to open the requested URL.", "Open URL failed", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
     }
 
     private void Window_Closing(object? sender, CancelEventArgs e)
@@ -1131,6 +1256,7 @@ public partial class MainWindow : Window
     private readonly record struct VoiceModelFixCandidate(
         string CharacterName,
         CharacterJsonPayload Payload,
+        string CurrentVoiceModel,
         string ResolvedVoiceModel);
 
     private enum FilterSelection
@@ -1138,6 +1264,14 @@ public partial class MainWindow : Window
         All,
         Yes,
         No
+    }
+
+    private enum GenderFilterSelection
+    {
+        All,
+        Female,
+        Male,
+        None
     }
 
     private sealed class CharacterJsonPayload
