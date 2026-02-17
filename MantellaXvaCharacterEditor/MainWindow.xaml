@@ -51,6 +51,7 @@
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
                         </Grid.RowDefinitions>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="115" />
@@ -76,27 +77,56 @@
                                          Checked="HasOverrideFilterRadioButton_Checked" />
                         </StackPanel>
 
-                        <TextBlock Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" Margin="0,0,10,8" Text="Valid voice model?" />
-                        <StackPanel Grid.Row="1" Grid.Column="1" Margin="0,0,0,8" Orientation="Horizontal" VerticalAlignment="Center">
-                            <RadioButton x:Name="ValidVoiceModelAllRadioButton"
-                                         GroupName="ValidVoiceModelFilter"
-                                         Content="All"
-                                         Margin="0,0,10,0"
-                                         IsChecked="True"
-                                         Checked="ValidVoiceModelFilterRadioButton_Checked" />
-                            <RadioButton x:Name="ValidVoiceModelYesRadioButton"
-                                         GroupName="ValidVoiceModelFilter"
-                                         Content="Yes"
-                                         Margin="0,0,10,0"
-                                         Checked="ValidVoiceModelFilterRadioButton_Checked" />
-                            <RadioButton x:Name="ValidVoiceModelNoRadioButton"
-                                         GroupName="ValidVoiceModelFilter"
-                                         Content="No"
-                                         Checked="ValidVoiceModelFilterRadioButton_Checked" />
-                        </StackPanel>
+                        <TextBlock Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" Margin="0,0,10,8" Text="Voice model status" />
+                        <Grid Grid.Row="1" Grid.Column="1" Margin="0,0,0,8" VerticalAlignment="Center">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
 
-                        <TextBlock Grid.Row="2" Grid.Column="0" VerticalAlignment="Center" Margin="0,0,10,8" Text="Gender" />
-                        <Grid Grid.Row="2" Grid.Column="1" Margin="0,0,0,8" VerticalAlignment="Center">
+                            <RadioButton x:Name="VoiceModelStatusAllRadioButton"
+                                         Grid.Row="0"
+                                         Grid.Column="0"
+                                         GroupName="VoiceModelStatusFilter"
+                                         Content="All"
+                                         Margin="0,0,18,4"
+                                         IsChecked="True"
+                                         Checked="VoiceModelStatusFilterRadioButton_Checked" />
+                            <RadioButton x:Name="VoiceModelStatusValidRadioButton"
+                                         Grid.Row="0"
+                                         Grid.Column="1"
+                                         GroupName="VoiceModelStatusFilter"
+                                         Content="Valid"
+                                         Margin="0,0,0,4"
+                                         Checked="VoiceModelStatusFilterRadioButton_Checked" />
+                            <RadioButton x:Name="VoiceModelStatusInvalidRadioButton"
+                                         Grid.Row="1"
+                                         Grid.Column="0"
+                                         GroupName="VoiceModelStatusFilter"
+                                         Content="Invalid"
+                                         Margin="0,0,18,0"
+                                         Checked="VoiceModelStatusFilterRadioButton_Checked" />
+                            <RadioButton x:Name="VoiceModelStatusNoneRadioButton"
+                                         Grid.Row="1"
+                                         Grid.Column="1"
+                                         GroupName="VoiceModelStatusFilter"
+                                         Content="None"
+                                         Checked="VoiceModelStatusFilterRadioButton_Checked" />
+                        </Grid>
+
+                        <TextBlock Grid.Row="2" Grid.Column="0" VerticalAlignment="Center" Margin="0,0,10,8" Text="Voice model" />
+                        <ComboBox x:Name="VoiceModelFilterComboBox"
+                                  Grid.Row="2"
+                                  Grid.Column="1"
+                                  Margin="0,0,0,8"
+                                  SelectionChanged="VoiceModelFilterComboBox_SelectionChanged" />
+
+                        <TextBlock Grid.Row="3" Grid.Column="0" VerticalAlignment="Center" Margin="0,0,10,8" Text="Gender" />
+                        <Grid Grid.Row="3" Grid.Column="1" Margin="0,0,0,8" VerticalAlignment="Center">
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
@@ -136,23 +166,23 @@
                                          Checked="GenderFilterRadioButton_Checked" />
                         </Grid>
 
-                        <TextBlock Grid.Row="3" Grid.Column="0" VerticalAlignment="Center" Margin="0,0,10,8" Text="Race" />
+                        <TextBlock Grid.Row="4" Grid.Column="0" VerticalAlignment="Center" Margin="0,0,10,8" Text="Race" />
                         <ComboBox x:Name="RaceFilterComboBox"
-                                  Grid.Row="3"
+                                  Grid.Row="4"
                                   Grid.Column="1"
                                   Margin="0,0,0,8"
                                   SelectionChanged="RaceFilterComboBox_SelectionChanged" />
 
-                        <TextBlock Grid.Row="4" Grid.Column="0" VerticalAlignment="Center" Margin="0,0,10,8" Text="Species" />
+                        <TextBlock Grid.Row="5" Grid.Column="0" VerticalAlignment="Center" Margin="0,0,10,8" Text="Species" />
                         <ComboBox x:Name="SpeciesFilterComboBox"
-                                  Grid.Row="4"
+                                  Grid.Row="5"
                                   Grid.Column="1"
                                   Margin="0,0,0,8"
                                   SelectionChanged="SpeciesFilterComboBox_SelectionChanged" />
 
-                        <TextBlock Grid.Row="5" Grid.Column="0" VerticalAlignment="Center" Margin="0,0,10,0" Text="Name" />
+                        <TextBlock Grid.Row="6" Grid.Column="0" VerticalAlignment="Center" Margin="0,0,10,0" Text="Name" />
                         <TextBox x:Name="NameFilterTextBox"
-                                 Grid.Row="5"
+                                 Grid.Row="6"
                                  Grid.Column="1"
                                  VerticalAlignment="Center"
                                  TextChanged="NameFilterTextBox_TextChanged" />

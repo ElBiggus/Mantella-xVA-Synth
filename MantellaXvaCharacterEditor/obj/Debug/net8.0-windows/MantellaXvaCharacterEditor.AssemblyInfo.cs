@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("MantellaXvaCharacterEditor")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("0.2.1.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("0.2.1+62b21c9082a35042b9ca12cd8c77abba67ae9152")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("0.2.1+9b0b3ee04480db9dd58fd90c89964a326efc5f7f")]
 [assembly: System.Reflection.AssemblyProductAttribute("MantellaXvaCharacterEditor")]
 [assembly: System.Reflection.AssemblyTitleAttribute("MantellaXvaCharacterEditor")]
 [assembly: System.Reflection.AssemblyVersionAttribute("0.2.1.0")]

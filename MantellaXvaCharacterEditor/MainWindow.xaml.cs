@@ -37,6 +37,7 @@ public partial class MainWindow : Window
     private CharacterFormData _lastSavedOrLoadedState = CharacterFormData.Empty;
 
     private List<string> _characterNames = new();
+    private List<string> _voiceModelFilterValues = new();
     private List<string> _speciesValues = new();
     private List<string> _raceValues = new();
     private List<CharacterListEntry> _allCharacters = new();
@@ -180,6 +181,13 @@ public partial class MainWindow : Window
             .OrderBy(value => value, StringComparer.CurrentCultureIgnoreCase)
             .ToList();
 
+        _voiceModelFilterValues = rows
+            .Select(row => GetColumnValue(row, VoiceModelColumnIndex))
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(value => value, StringComparer.CurrentCultureIgnoreCase)
+            .ToList();
+
         _raceValues = rows
             .Select(row => GetColumnValue(row, RaceColumnIndex))
             .Where(value => !string.IsNullOrWhiteSpace(value))
@@ -307,7 +315,8 @@ public partial class MainWindow : Window
 
         var nameFilter = NameFilterTextBox.Text.Trim();
         var hasOverrideFilter = GetRadioFilterSelection(HasOverrideAllRadioButton, HasOverrideYesRadioButton);
-        var validVoiceModelFilter = GetRadioFilterSelection(ValidVoiceModelAllRadioButton, ValidVoiceModelYesRadioButton);
+        var voiceModelStatusFilter = GetVoiceModelStatusFilterSelection();
+        var voiceModelFilter = GetFilterDropdownValue(VoiceModelFilterComboBox);
         var genderFilter = GetGenderFilterSelection();
         var raceFilter = GetFilterDropdownValue(RaceFilterComboBox);
         var speciesFilter = GetFilterDropdownValue(SpeciesFilterComboBox);
@@ -316,7 +325,8 @@ public partial class MainWindow : Window
             .Where(character =>
                 MatchesNameFilter(character.Name, nameFilter)
                 && MatchesHasOverrideFilter(character.Name, hasOverrideFilter)
-                && MatchesValidVoiceModelFilter(character.VoiceModel, validVoiceModelFilter)
+                && MatchesVoiceModelStatusFilter(character.VoiceModel, voiceModelStatusFilter)
+                && MatchesExactFilter(character.VoiceModel, voiceModelFilter)
                 && MatchesGenderFilter(character.Gender, genderFilter)
                 && MatchesExactFilter(character.Race, raceFilter)
                 && MatchesExactFilter(character.Species, speciesFilter))
@@ -345,12 +355,15 @@ public partial class MainWindow : Window
     {
         return NameFilterTextBox is not null
             && CharacterListBox is not null
+            && VoiceModelFilterComboBox is not null
             && RaceFilterComboBox is not null
             && SpeciesFilterComboBox is not null
             && HasOverrideAllRadioButton is not null
             && HasOverrideYesRadioButton is not null
-            && ValidVoiceModelAllRadioButton is not null
-            && ValidVoiceModelYesRadioButton is not null
+            && VoiceModelStatusAllRadioButton is not null
+            && VoiceModelStatusValidRadioButton is not null
+            && VoiceModelStatusInvalidRadioButton is not null
+            && VoiceModelStatusNoneRadioButton is not null
             && GenderFilterAllRadioButton is not null
             && GenderFilterFemaleRadioButton is not null
             && GenderFilterMaleRadioButton is not null
@@ -366,6 +379,7 @@ public partial class MainWindow : Window
 
         SetFilterDropdownValues(RaceFilterComboBox, _raceValues);
         SetFilterDropdownValues(SpeciesFilterComboBox, _speciesValues);
+        SetFilterDropdownValues(VoiceModelFilterComboBox, _voiceModelFilterValues);
     }
 
     private static void SetFilterDropdownValues(ComboBox comboBox, IReadOnlyList<string> values)
@@ -450,17 +464,43 @@ public partial class MainWindow : Window
         return hasOverrideFilter == FilterSelection.Yes ? hasOverride : !hasOverride;
     }
 
-    private bool MatchesValidVoiceModelFilter(string voiceModel, FilterSelection validVoiceModelFilter)
+    private VoiceModelStatusFilterSelection GetVoiceModelStatusFilterSelection()
     {
-        if (validVoiceModelFilter == FilterSelection.All)
+        if (VoiceModelStatusValidRadioButton.IsChecked == true)
+        {
+            return VoiceModelStatusFilterSelection.Valid;
+        }
+
+        if (VoiceModelStatusInvalidRadioButton.IsChecked == true)
+        {
+            return VoiceModelStatusFilterSelection.Invalid;
+        }
+
+        if (VoiceModelStatusNoneRadioButton.IsChecked == true)
+        {
+            return VoiceModelStatusFilterSelection.None;
+        }
+
+        return VoiceModelStatusFilterSelection.All;
+    }
+
+    private bool MatchesVoiceModelStatusFilter(string voiceModel, VoiceModelStatusFilterSelection voiceModelStatusFilter)
+    {
+        if (voiceModelStatusFilter == VoiceModelStatusFilterSelection.All)
         {
             return true;
         }
 
-        var hasValidVoiceModel = !string.IsNullOrWhiteSpace(voiceModel)
-            && _voiceModelNames.Contains(voiceModel);
+        var hasVoiceModel = !string.IsNullOrWhiteSpace(voiceModel);
+        var hasValidVoiceModel = hasVoiceModel && _voiceModelNames.Contains(voiceModel);
 
-        return validVoiceModelFilter == FilterSelection.Yes ? hasValidVoiceModel : !hasValidVoiceModel;
+        return voiceModelStatusFilter switch
+        {
+            VoiceModelStatusFilterSelection.Valid => hasValidVoiceModel,
+            VoiceModelStatusFilterSelection.Invalid => hasVoiceModel && !hasValidVoiceModel,
+            VoiceModelStatusFilterSelection.None => !hasVoiceModel,
+            _ => true
+        };
     }
 
     private static bool MatchesGenderFilter(string gender, GenderFilterSelection genderFilter)
@@ -1034,7 +1074,12 @@ public partial class MainWindow : Window
         ApplyCharacterFilters();
     }
 
-    private void ValidVoiceModelFilterRadioButton_Checked(object sender, RoutedEventArgs e)
+    private void VoiceModelStatusFilterRadioButton_Checked(object sender, RoutedEventArgs e)
+    {
+        ApplyCharacterFilters();
+    }
+
+    private void VoiceModelFilterComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         ApplyCharacterFilters();
     }
@@ -1271,6 +1316,14 @@ public partial class MainWindow : Window
         All,
         Female,
         Male,
+        None
+    }
+
+    private enum VoiceModelStatusFilterSelection
+    {
+        All,
+        Valid,
+        Invalid,
         None
     }
 
