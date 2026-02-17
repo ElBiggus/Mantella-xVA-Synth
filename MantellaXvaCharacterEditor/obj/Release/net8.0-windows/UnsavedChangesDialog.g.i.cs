@@ -52,7 +52,7 @@ namespace MantellaXvaCharacterEditor {
                 return;
             }
             _contentLoaded = true;
-            System.Uri resourceLocater = new System.Uri("/MantellaXvaCharacterEditor;component/unsavedchangesdialog.xaml", System.UriKind.Relative);
+            System.Uri resourceLocater = new System.Uri("/MantellaXvaCharacterEditor;V0.2.1.0;component/unsavedchangesdialog.xaml", System.UriKind.Relative);
             
             #line 1 "..\..\..\UnsavedChangesDialog.xaml"
             System.Windows.Application.LoadComponent(this, resourceLocater);

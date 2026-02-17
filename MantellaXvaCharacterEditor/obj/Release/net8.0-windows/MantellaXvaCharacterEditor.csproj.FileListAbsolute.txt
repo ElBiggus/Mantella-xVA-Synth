@@ -20,3 +20,5 @@ D:\Dev\GitHub\Mantella-xVA-Synth\MantellaXvaCharacterEditor\obj\Release\net8.0-w
 D:\Dev\GitHub\Mantella-xVA-Synth\MantellaXvaCharacterEditor\obj\Release\net8.0-windows\MantellaXvaCharacterEditor.pdb
 D:\Dev\GitHub\Mantella-xVA-Synth\MantellaXvaCharacterEditor\obj\Release\net8.0-windows\MantellaXvaCharacterEditor.genruntimeconfig.cache
 D:\Dev\GitHub\Mantella-xVA-Synth\MantellaXvaCharacterEditor\obj\Release\net8.0-windows\ref\MantellaXvaCharacterEditor.dll
+D:\Dev\GitHub\Mantella-xVA-Synth\MantellaXvaCharacterEditor\obj\Release\net8.0-windows\VoiceModelFixPreviewDialog.baml
+D:\Dev\GitHub\Mantella-xVA-Synth\MantellaXvaCharacterEditor\obj\Release\net8.0-windows\VoiceModelFixPreviewDialog.g.cs

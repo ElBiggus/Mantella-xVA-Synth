@@ -17,10 +17,22 @@
         <Menu DockPanel.Dock="Top">
             <MenuItem Header="_File">
                 <MenuItem Header="Set xVA-Synth folder" Click="SetXvaSynthFolderMenuItem_Click" />
+                <MenuItem Header="Set xTTS folder" Click="SetXTtsFolderMenuItem_Click" />
                 <MenuItem Header="Preview invalid voice model fixes..." Click="PreviewInvalidVoiceModelsMenuItem_Click" />
                 <MenuItem Header="Fix invalid voice models..." Click="FixInvalidVoiceModelsMenuItem_Click" />
                 <Separator />
                 <MenuItem Header="Quit" Click="QuitMenuItem_Click" />
+            </MenuItem>
+            <MenuItem Header="_Mode">
+                <MenuItem x:Name="XvaSynthModeMenuItem"
+                          Header="xVA Synth"
+                          IsCheckable="True"
+                          IsChecked="True"
+                          Click="XvaSynthModeMenuItem_Click" />
+                <MenuItem x:Name="XTtsModeMenuItem"
+                          Header="xTTS"
+                          IsCheckable="True"
+                          Click="XTtsModeMenuItem_Click" />
             </MenuItem>
             <MenuItem Header="_Help">
                 <MenuItem Header="View on Nexus Mods" Click="ViewOnNexusModsMenuItem_Click" />

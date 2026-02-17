@@ -22,13 +22,26 @@
 
         <ListView x:Name="PreviewListView"
                   Grid.Row="1"
+                  GridViewColumnHeader.Click="GridViewColumnHeader_Click"
                   ScrollViewer.VerticalScrollBarVisibility="Auto"
                   ScrollViewer.HorizontalScrollBarVisibility="Auto">
             <ListView.View>
                 <GridView>
-                    <GridViewColumn Header="Character" Width="220" DisplayMemberBinding="{Binding CharacterName}" />
-                    <GridViewColumn Header="Current voice model" Width="220" DisplayMemberBinding="{Binding CurrentVoiceModel}" />
-                    <GridViewColumn Header="New voice model" Width="220" DisplayMemberBinding="{Binding NewVoiceModel}" />
+                    <GridViewColumn Width="220" DisplayMemberBinding="{Binding CharacterName}">
+                        <GridViewColumn.Header>
+                            <GridViewColumnHeader Content="Character" Tag="CharacterName" />
+                        </GridViewColumn.Header>
+                    </GridViewColumn>
+                    <GridViewColumn Width="220" DisplayMemberBinding="{Binding CurrentVoiceModel}">
+                        <GridViewColumn.Header>
+                            <GridViewColumnHeader Content="Current voice model" Tag="CurrentVoiceModel" />
+                        </GridViewColumn.Header>
+                    </GridViewColumn>
+                    <GridViewColumn Width="220" DisplayMemberBinding="{Binding NewVoiceModel}">
+                        <GridViewColumn.Header>
+                            <GridViewColumnHeader Content="New voice model" Tag="NewVoiceModel" />
+                        </GridViewColumn.Header>
+                    </GridViewColumn>
                 </GridView>
             </ListView.View>
         </ListView>

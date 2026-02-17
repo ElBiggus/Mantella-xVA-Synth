@@ -15,7 +15,10 @@ namespace MantellaXvaCharacterEditor;
 public partial class MainWindow : Window
 {
     private const string CsvFileName = "skyrim_characters.csv";
-    private const string VoiceModelFallbackLabel = "Set xVA Folder!";
+    private const string XTtsLanguageCode = "en";
+    private const string XTtsRelativeModelDirectory = "latent_speaker_folder";
+    private const string XvaSynthModeSettingValue = "xva-synth";
+    private const string XTtsModeSettingValue = "xtts";
     private const string SettingsFolderName = "MantellaXvaCharacterEditor";
     private const string SettingsFileName = "settings.json";
     private const string FilterAllOptionLabel = "-- ALL --";
@@ -29,7 +32,9 @@ public partial class MainWindow : Window
     private const int SpeciesColumnIndex = 8;
 
     private string? _xvaSynthDirectory;
+    private string? _xttsDirectory;
     private string? _csvFilePath;
+    private TtsProviderMode _currentMode = TtsProviderMode.XvaSynth;
     private bool _isLoadingFields;
     private bool _isProgrammaticCharacterSelection;
     private bool _isDirty;
@@ -42,6 +47,7 @@ public partial class MainWindow : Window
     private List<string> _raceValues = new();
     private List<CharacterListEntry> _allCharacters = new();
     private HashSet<string> _voiceModelNames = new(StringComparer.CurrentCultureIgnoreCase);
+    private HashSet<string> _voiceModelNameKeys = new(StringComparer.OrdinalIgnoreCase);
 
     public MainWindow()
     {
@@ -52,7 +58,11 @@ public partial class MainWindow : Window
     private void LoadInitialData()
     {
         _csvFilePath = FindCsvFilePath();
-        _xvaSynthDirectory = LoadPersistedXvaSynthDirectory();
+        var settings = LoadSettings();
+        _xvaSynthDirectory = string.IsNullOrWhiteSpace(settings.XvaSynthDirectory) ? null : settings.XvaSynthDirectory;
+        _xttsDirectory = string.IsNullOrWhiteSpace(settings.XTtsDirectory) ? null : settings.XTtsDirectory;
+        _currentMode = ParsePersistedMode(settings.Mode);
+        UpdateModeMenuChecks();
         RefreshCsvDerivedLists();
         UpdateVoiceModelList();
         UpdateLoadExistingOverrideButtonState();
@@ -99,29 +109,27 @@ public partial class MainWindow : Window
         LoadExistingOverrideButton.IsEnabled = !string.IsNullOrWhiteSpace(overridePath) && File.Exists(overridePath);
     }
 
-    private string? LoadPersistedXvaSynthDirectory()
+    private UserSettings LoadSettings()
     {
         try
         {
             var settingsPath = GetSettingsFilePath();
             if (!File.Exists(settingsPath))
             {
-                return null;
+                return new UserSettings();
             }
 
             var json = File.ReadAllText(settingsPath);
             var settings = JsonSerializer.Deserialize<UserSettings>(json);
-            return string.IsNullOrWhiteSpace(settings?.XvaSynthDirectory)
-                ? null
-                : settings!.XvaSynthDirectory;
+            return settings ?? new UserSettings();
         }
         catch
         {
-            return null;
+            return new UserSettings();
         }
     }
 
-    private void PersistXvaSynthDirectory(string? directory)
+    private void PersistSettings()
     {
         try
         {
@@ -134,7 +142,9 @@ public partial class MainWindow : Window
 
             var settings = new UserSettings
             {
-                XvaSynthDirectory = string.IsNullOrWhiteSpace(directory) ? null : directory
+                XvaSynthDirectory = string.IsNullOrWhiteSpace(_xvaSynthDirectory) ? null : _xvaSynthDirectory,
+                XTtsDirectory = string.IsNullOrWhiteSpace(_xttsDirectory) ? null : _xttsDirectory,
+                Mode = _currentMode == TtsProviderMode.XTts ? XTtsModeSettingValue : XvaSynthModeSettingValue
             };
 
             var json = JsonSerializer.Serialize(settings, new JsonSerializerOptions { WriteIndented = true });
@@ -143,6 +153,88 @@ public partial class MainWindow : Window
         catch
         {
         }
+    }
+
+    private TtsProviderMode ParsePersistedMode(string? persistedMode)
+    {
+        return string.Equals(persistedMode, XTtsModeSettingValue, StringComparison.OrdinalIgnoreCase)
+            ? TtsProviderMode.XTts
+            : TtsProviderMode.XvaSynth;
+    }
+
+    private string? GetCurrentProviderDirectory()
+    {
+        return _currentMode == TtsProviderMode.XTts ? _xttsDirectory : _xvaSynthDirectory;
+    }
+
+    private static string GetVoiceModelFallbackLabel(TtsProviderMode mode)
+    {
+        return mode == TtsProviderMode.XTts ? "Set xTTS Folder!" : "Set xVA Folder!";
+    }
+
+    private void UpdateModeMenuChecks()
+    {
+        if (XvaSynthModeMenuItem is null || XTtsModeMenuItem is null)
+        {
+            return;
+        }
+
+        XvaSynthModeMenuItem.IsChecked = _currentMode == TtsProviderMode.XvaSynth;
+        XTtsModeMenuItem.IsChecked = _currentMode == TtsProviderMode.XTts;
+    }
+
+    private void ResetLoadedDataForModeSwitch()
+    {
+        _isLoadingFields = true;
+        CharacterNameTextBox.Text = string.Empty;
+        BioTextBox.Text = string.Empty;
+        VoiceModelComboBox.SelectedItem = null;
+        VoiceModelComboBox.Text = string.Empty;
+        GenderComboBox.SelectedIndex = -1;
+        SpeciesComboBox.SelectedIndex = -1;
+        RaceComboBox.SelectedIndex = -1;
+        _isLoadingFields = false;
+
+        _selectedCharacterName = null;
+        _allCharacters = new List<CharacterListEntry>();
+        _characterNames = new List<string>();
+        _voiceModelFilterValues = new List<string>();
+        _speciesValues = new List<string>();
+        _raceValues = new List<string>();
+        _voiceModelNames = new HashSet<string>(StringComparer.CurrentCultureIgnoreCase);
+        _voiceModelNameKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        _isProgrammaticCharacterSelection = true;
+        CharacterListBox.ItemsSource = Array.Empty<string>();
+        CharacterListBox.SelectedItem = null;
+        _isProgrammaticCharacterSelection = false;
+
+        _lastSavedOrLoadedState = CaptureCurrentFormState();
+        UpdateLoadExistingOverrideButtonState();
+        SetDirtyState(false);
+    }
+
+    private void SwitchMode(TtsProviderMode nextMode)
+    {
+        if (_currentMode == nextMode)
+        {
+            UpdateModeMenuChecks();
+            return;
+        }
+
+        if (!HandlePendingChanges())
+        {
+            UpdateModeMenuChecks();
+            return;
+        }
+
+        _currentMode = nextMode;
+        PersistSettings();
+        UpdateModeMenuChecks();
+        ResetLoadedDataForModeSwitch();
+        RefreshCsvDerivedLists();
+        UpdateVoiceModelList();
+        UpdateLoadExistingOverrideButtonState();
     }
 
     private void RefreshCsvDerivedLists()
@@ -286,11 +378,16 @@ public partial class MainWindow : Window
     private void UpdateVoiceModelList()
     {
         var selectedVoice = VoiceModelComboBox.SelectedItem?.ToString();
-        var modelNames = GetVoiceModelNames(_xvaSynthDirectory);
+        var modelNames = GetVoiceModelNames(_currentMode, GetCurrentProviderDirectory());
+        var fallbackLabel = GetVoiceModelFallbackLabel(_currentMode);
         _voiceModelNames = modelNames
             .Where(modelName => !string.IsNullOrWhiteSpace(modelName) &&
-                                !string.Equals(modelName, VoiceModelFallbackLabel, StringComparison.CurrentCultureIgnoreCase))
+                                !string.Equals(modelName, fallbackLabel, StringComparison.CurrentCultureIgnoreCase))
             .ToHashSet(StringComparer.CurrentCultureIgnoreCase);
+        _voiceModelNameKeys = _voiceModelNames
+            .Select(NormalizeForContainsMatch)
+            .Where(modelKey => !string.IsNullOrWhiteSpace(modelKey))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
         VoiceModelComboBox.ItemsSource = modelNames;
 
@@ -492,12 +589,15 @@ public partial class MainWindow : Window
         }
 
         var hasVoiceModel = !string.IsNullOrWhiteSpace(voiceModel);
-        var hasValidVoiceModel = hasVoiceModel && _voiceModelNames.Contains(voiceModel);
+        var voiceModelKey = NormalizeForContainsMatch(voiceModel);
+        var hasValidVoiceModel = hasVoiceModel
+            && !string.IsNullOrWhiteSpace(voiceModelKey)
+            && _voiceModelNameKeys.Contains(voiceModelKey);
 
         return voiceModelStatusFilter switch
         {
             VoiceModelStatusFilterSelection.Valid => hasValidVoiceModel,
-            VoiceModelStatusFilterSelection.Invalid => hasVoiceModel && !hasValidVoiceModel,
+            VoiceModelStatusFilterSelection.Invalid => !hasValidVoiceModel,
             VoiceModelStatusFilterSelection.None => !hasVoiceModel,
             _ => true
         };
@@ -524,21 +624,21 @@ public partial class MainWindow : Window
         return string.Equals(sourceValue, filterValue, StringComparison.CurrentCultureIgnoreCase);
     }
 
-    private static List<string> GetVoiceModelNames(string? xvaDirectory)
+    private static List<string> GetVoiceModelNames(TtsProviderMode mode, string? providerDirectory)
     {
-        if (string.IsNullOrWhiteSpace(xvaDirectory) || !Directory.Exists(xvaDirectory))
+        if (string.IsNullOrWhiteSpace(providerDirectory) || !Directory.Exists(providerDirectory))
         {
-            return new List<string> { VoiceModelFallbackLabel };
+            return new List<string> { GetVoiceModelFallbackLabel(mode) };
         }
 
-        var modelPath = Path.Combine(xvaDirectory, "resources", "app", "models", "Skyrim");
+        var modelPath = GetVoiceModelDirectoryPath(mode, providerDirectory);
         if (!Directory.Exists(modelPath))
         {
-            return new List<string> { VoiceModelFallbackLabel };
+            return new List<string> { GetVoiceModelFallbackLabel(mode) };
         }
 
-        var files = Directory
-            .EnumerateFiles(modelPath, "*.json", System.IO.SearchOption.TopDirectoryOnly)
+        var filePaths = EnumerateVoiceModelFiles(mode, modelPath).ToList();
+        var files = filePaths
             .Select(file => Path.GetFileName(file))
             .Where(fileName => !string.IsNullOrWhiteSpace(fileName))
             .Select(fileName => fileName!)
@@ -546,7 +646,7 @@ public partial class MainWindow : Window
 
         if (files.Count == 0)
         {
-            return new List<string> { VoiceModelFallbackLabel };
+            return new List<string> { GetVoiceModelFallbackLabel(mode) };
         }
 
         var culture = CultureInfo.CurrentCulture;
@@ -555,27 +655,50 @@ public partial class MainWindow : Window
         var modelNames = files
             .Select(fileName => Path.GetFileNameWithoutExtension(fileName))
             .Where(fileName => !string.IsNullOrWhiteSpace(fileName))
-            .Select(fileName => fileName!.StartsWith("sk_", StringComparison.OrdinalIgnoreCase)
-                ? fileName[3..]
-                : fileName)
+            .Select(fileName => NormalizeModelToken(fileName!, mode))
+            .Where(modelToken => !string.IsNullOrWhiteSpace(modelToken))
             .Select(fileName => fileName.Replace('_', ' ').Replace('-', ' '))
             .Select(fileName => textInfo.ToTitleCase(fileName.ToLower(culture)))
             .Distinct(StringComparer.CurrentCultureIgnoreCase)
             .OrderBy(fileName => fileName, StringComparer.CurrentCultureIgnoreCase)
             .ToList();
 
-        return modelNames.Count == 0 ? new List<string> { VoiceModelFallbackLabel } : modelNames;
+        return modelNames.Count == 0 ? new List<string> { GetVoiceModelFallbackLabel(mode) } : modelNames;
     }
 
-    private static string? GetVoiceModelDirectoryPath(string? xvaDirectory)
+    private static string? GetVoiceModelDirectoryPath(TtsProviderMode mode, string? providerDirectory)
     {
-        if (string.IsNullOrWhiteSpace(xvaDirectory) || !Directory.Exists(xvaDirectory))
+        if (string.IsNullOrWhiteSpace(providerDirectory) || !Directory.Exists(providerDirectory))
         {
             return null;
         }
 
-        var modelPath = Path.Combine(xvaDirectory, "resources", "app", "models", "Skyrim");
+        var modelPath = mode == TtsProviderMode.XTts
+            ? Path.Combine(providerDirectory, XTtsRelativeModelDirectory, XTtsLanguageCode)
+            : Path.Combine(providerDirectory, "resources", "app", "models", "Skyrim");
+
         return Directory.Exists(modelPath) ? modelPath : null;
+    }
+
+    private static IEnumerable<string> EnumerateVoiceModelFiles(TtsProviderMode mode, string modelDirectoryPath)
+    {
+        if (mode == TtsProviderMode.XTts)
+        {
+            return Directory.EnumerateFiles(modelDirectoryPath, "*", System.IO.SearchOption.TopDirectoryOnly);
+        }
+
+        return Directory.EnumerateFiles(modelDirectoryPath, "*.json", System.IO.SearchOption.TopDirectoryOnly);
+    }
+
+    private static string NormalizeModelToken(string fileNameWithoutExtension, TtsProviderMode mode)
+    {
+        if (mode == TtsProviderMode.XvaSynth
+            && fileNameWithoutExtension.StartsWith("sk_", StringComparison.OrdinalIgnoreCase))
+        {
+            return fileNameWithoutExtension[3..];
+        }
+
+        return fileNameWithoutExtension;
     }
 
     private void PreviewInvalidVoiceModelsMenuItem_Click(object sender, RoutedEventArgs e)
@@ -585,11 +708,16 @@ public partial class MainWindow : Window
             return;
         }
 
-        var candidates = BuildVoiceModelFixCandidates(models, csvByName, visibleCharacterNames, out var skippedCount);
+        var candidates = BuildVoiceModelFixCandidates(models, csvByName, visibleCharacterNames, out var skippedCount, out var alreadyValidOverrideCount);
         var summaryMessage = $"Would update {candidates.Count} voice models";
         if (skippedCount > 0)
         {
             summaryMessage += $" and {skippedCount} entries wouldn't be updated";
+        }
+
+        if (alreadyValidOverrideCount > 0)
+        {
+            summaryMessage += $"; {alreadyValidOverrideCount} already had a valid override voice model";
         }
 
         var previewItems = candidates
@@ -618,12 +746,12 @@ public partial class MainWindow : Window
             return;
         }
 
-        var candidates = BuildVoiceModelFixCandidates(models, csvByName, visibleCharacterNames, out var skippedCount);
+        var candidates = BuildVoiceModelFixCandidates(models, csvByName, visibleCharacterNames, out var skippedCount, out var alreadyValidOverrideCount);
 
         foreach (var candidate in candidates)
         {
             candidate.Payload.VoiceModel = candidate.ResolvedVoiceModel;
-            SaveOverridePayload(candidate.Payload);
+            SaveOverridePayload(candidate.Payload, candidate.CharacterName);
         }
 
         RefreshCsvDerivedLists();
@@ -634,6 +762,11 @@ public partial class MainWindow : Window
         if (skippedCount > 0)
         {
             summaryMessage += $" and {skippedCount} entries weren't updated";
+        }
+
+        if (alreadyValidOverrideCount > 0)
+        {
+            summaryMessage += $"; skipped {alreadyValidOverrideCount} entries with valid override voice models";
         }
 
         MessageBox.Show(this, summaryMessage, "Fix invalid voice models", MessageBoxButton.OK, MessageBoxImage.Information);
@@ -648,23 +781,24 @@ public partial class MainWindow : Window
         csvByName = new Dictionary<string, CharacterListEntry>(StringComparer.OrdinalIgnoreCase);
         visibleCharacterNames = new List<string>();
 
-        var modelDirectoryPath = GetVoiceModelDirectoryPath(_xvaSynthDirectory);
+        var modelDirectoryPath = GetVoiceModelDirectoryPath(_currentMode, GetCurrentProviderDirectory());
         if (string.IsNullOrWhiteSpace(modelDirectoryPath))
         {
-            MessageBox.Show(this, "Set a valid xVA-Synth folder first.", "xVA-Synth folder required", MessageBoxButton.OK, MessageBoxImage.Warning);
+            var providerName = _currentMode == TtsProviderMode.XTts ? "xTTS" : "xVA-Synth";
+            MessageBox.Show(this, $"Set a valid {providerName} folder first.", $"{providerName} folder required", MessageBoxButton.OK, MessageBoxImage.Warning);
             return false;
         }
 
-        models = Directory
-            .EnumerateFiles(modelDirectoryPath, "*.json", System.IO.SearchOption.TopDirectoryOnly)
-            .Select(filePath => BuildVoiceModelCandidate(filePath))
+        models = EnumerateVoiceModelFiles(_currentMode, modelDirectoryPath)
+            .Select(filePath => BuildVoiceModelCandidate(filePath, _currentMode))
             .Where(candidate => candidate is not null)
             .Select(candidate => candidate!.Value)
             .ToList();
 
         if (models.Count == 0)
         {
-            MessageBox.Show(this, "No voice model JSON files were found in the xVA-Synth models folder.", "No voice models found", MessageBoxButton.OK, MessageBoxImage.Warning);
+            var providerName = _currentMode == TtsProviderMode.XTts ? "xTTS" : "xVA-Synth";
+            MessageBox.Show(this, $"No voice model files were found in the {providerName} models folder.", "No voice models found", MessageBoxButton.OK, MessageBoxImage.Warning);
             return false;
         }
 
@@ -696,10 +830,16 @@ public partial class MainWindow : Window
         IReadOnlyList<VoiceModelCandidate> models,
         IReadOnlyDictionary<string, CharacterListEntry> csvByName,
         IReadOnlyList<string> visibleCharacterNames,
-        out int skippedCount)
+        out int skippedCount,
+        out int alreadyValidOverrideCount)
     {
         skippedCount = 0;
+        alreadyValidOverrideCount = 0;
         var candidates = new List<VoiceModelFixCandidate>();
+        var validModelKeys = models
+            .Select(model => NormalizeForContainsMatch(model.VoiceModelName))
+            .Where(modelKey => !string.IsNullOrWhiteSpace(modelKey))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
         foreach (var characterName in visibleCharacterNames)
         {
@@ -708,8 +848,33 @@ public partial class MainWindow : Window
                 continue;
             }
 
-            var payload = LoadOrCreateOverridePayload(characterName, csvEntry);
-            var resolvedModel = ResolveVoiceModelName(payload.Name, payload.Gender, payload.Race, payload.Species, models);
+            CharacterJsonPayload payload;
+            if (TryLoadOverridePayload(characterName, out var overridePayload))
+            {
+                if (IsValidVoiceModelName(overridePayload.VoiceModel, validModelKeys))
+                {
+                    alreadyValidOverrideCount++;
+                    continue;
+                }
+
+                payload = overridePayload;
+            }
+            else
+            {
+                if (IsValidVoiceModelName(csvEntry.VoiceModel, validModelKeys))
+                {
+                    continue;
+                }
+
+                payload = CreatePayloadFromCsv(csvEntry);
+            }
+
+            var resolveName = string.IsNullOrWhiteSpace(payload.Name) ? csvEntry.Name : payload.Name;
+            var resolveGender = string.IsNullOrWhiteSpace(payload.Gender) ? csvEntry.Gender : payload.Gender;
+            var resolveRace = string.IsNullOrWhiteSpace(payload.Race) ? csvEntry.Race : payload.Race;
+            var resolveSpecies = string.IsNullOrWhiteSpace(payload.Species) ? csvEntry.Species : payload.Species;
+
+            var resolvedModel = ResolveVoiceModelName(resolveName, resolveGender, resolveRace, resolveSpecies, models);
             if (string.IsNullOrWhiteSpace(resolvedModel))
             {
                 skippedCount++;
@@ -722,8 +887,21 @@ public partial class MainWindow : Window
         return candidates;
     }
 
-    private CharacterJsonPayload LoadOrCreateOverridePayload(string characterName, CharacterListEntry csvEntry)
+    private static bool IsValidVoiceModelName(string voiceModel, IReadOnlySet<string> validModelKeys)
     {
+        if (string.IsNullOrWhiteSpace(voiceModel))
+        {
+            return false;
+        }
+
+        var voiceModelKey = NormalizeForContainsMatch(voiceModel);
+        return !string.IsNullOrWhiteSpace(voiceModelKey)
+            && validModelKeys.Contains(voiceModelKey);
+    }
+
+    private bool TryLoadOverridePayload(string characterName, out CharacterJsonPayload payload)
+    {
+        payload = new CharacterJsonPayload();
         var overridePath = BuildCharacterOverrideFilePath(characterName);
         if (!string.IsNullOrWhiteSpace(overridePath) && File.Exists(overridePath))
         {
@@ -733,15 +911,8 @@ public partial class MainWindow : Window
                 var existingPayload = JsonSerializer.Deserialize<CharacterJsonPayload>(json);
                 if (existingPayload is not null)
                 {
-                    return new CharacterJsonPayload
-                    {
-                        Name = string.IsNullOrWhiteSpace(existingPayload.Name) ? csvEntry.Name : existingPayload.Name,
-                        VoiceModel = existingPayload.VoiceModel,
-                        Bio = string.IsNullOrWhiteSpace(existingPayload.Bio) ? csvEntry.Bio : existingPayload.Bio,
-                        Race = string.IsNullOrWhiteSpace(existingPayload.Race) ? csvEntry.Race : existingPayload.Race,
-                        Gender = string.IsNullOrWhiteSpace(existingPayload.Gender) ? csvEntry.Gender : existingPayload.Gender,
-                        Species = string.IsNullOrWhiteSpace(existingPayload.Species) ? csvEntry.Species : existingPayload.Species
-                    };
+                    payload = existingPayload;
+                    return true;
                 }
             }
             catch
@@ -749,6 +920,11 @@ public partial class MainWindow : Window
             }
         }
 
+        return false;
+    }
+
+    private static CharacterJsonPayload CreatePayloadFromCsv(CharacterListEntry csvEntry)
+    {
         return new CharacterJsonPayload
         {
             Name = csvEntry.Name,
@@ -760,7 +936,7 @@ public partial class MainWindow : Window
         };
     }
 
-    private static VoiceModelCandidate? BuildVoiceModelCandidate(string filePath)
+    private static VoiceModelCandidate? BuildVoiceModelCandidate(string filePath, TtsProviderMode mode)
     {
         var fileNameWithoutExtension = Path.GetFileNameWithoutExtension(filePath);
         if (string.IsNullOrWhiteSpace(fileNameWithoutExtension))
@@ -768,18 +944,15 @@ public partial class MainWindow : Window
             return null;
         }
 
-        var normalizedForContains = NormalizeForContainsMatch(fileNameWithoutExtension);
-        var normalizedForSegmentedPattern = NormalizeForSegmentedPattern(fileNameWithoutExtension);
-        if (string.IsNullOrWhiteSpace(normalizedForContains) || string.IsNullOrWhiteSpace(normalizedForSegmentedPattern))
+        var modelToken = NormalizeModelToken(fileNameWithoutExtension, mode);
+        if (string.IsNullOrWhiteSpace(modelToken))
         {
             return null;
         }
 
-        var modelToken = fileNameWithoutExtension.StartsWith("sk_", StringComparison.OrdinalIgnoreCase)
-            ? fileNameWithoutExtension[3..]
-            : fileNameWithoutExtension;
-
-        if (string.IsNullOrWhiteSpace(modelToken))
+        var normalizedForContains = NormalizeForContainsMatch(modelToken);
+        var normalizedForSegmentedPattern = NormalizeForSegmentedPattern(modelToken);
+        if (string.IsNullOrWhiteSpace(normalizedForContains) || string.IsNullOrWhiteSpace(normalizedForSegmentedPattern))
         {
             return null;
         }
@@ -808,9 +981,7 @@ public partial class MainWindow : Window
         var normalizedGender = NormalizeForContainsMatch(gender);
         var normalizedRace = NormalizeForContainsMatch(race);
         var normalizedSpecies = NormalizeForContainsMatch(species);
-        var genderWithLeadingUnderscore = string.IsNullOrWhiteSpace(normalizedGender)
-            ? string.Empty
-            : $"_{normalizedGender}";
+        var genderToken = normalizedGender;
 
         if (!string.IsNullOrWhiteSpace(normalizedName))
         {
@@ -821,30 +992,30 @@ public partial class MainWindow : Window
             }
         }
 
-        if (!string.IsNullOrWhiteSpace(genderWithLeadingUnderscore) && !string.IsNullOrWhiteSpace(normalizedRace))
+        if (!string.IsNullOrWhiteSpace(genderToken) && !string.IsNullOrWhiteSpace(normalizedRace))
         {
             var byGenderRace = models.FirstOrDefault(model =>
-                ContainsInOrder(model.NormalizedForSegmentedPattern, genderWithLeadingUnderscore, normalizedRace));
+                ContainsInOrder(model.NormalizedForSegmentedPattern, genderToken, normalizedRace));
             if (!string.IsNullOrWhiteSpace(byGenderRace.VoiceModelName))
             {
                 return byGenderRace.VoiceModelName;
             }
         }
 
-        if (!string.IsNullOrWhiteSpace(genderWithLeadingUnderscore) && !string.IsNullOrWhiteSpace(normalizedSpecies))
+        if (!string.IsNullOrWhiteSpace(genderToken) && !string.IsNullOrWhiteSpace(normalizedSpecies))
         {
             var byGenderSpecies = models.FirstOrDefault(model =>
-                ContainsInOrder(model.NormalizedForSegmentedPattern, genderWithLeadingUnderscore, normalizedSpecies));
+                ContainsInOrder(model.NormalizedForSegmentedPattern, genderToken, normalizedSpecies));
             if (!string.IsNullOrWhiteSpace(byGenderSpecies.VoiceModelName))
             {
                 return byGenderSpecies.VoiceModelName;
             }
         }
 
-        if (!string.IsNullOrWhiteSpace(genderWithLeadingUnderscore))
+        if (!string.IsNullOrWhiteSpace(genderToken))
         {
             var byEventoned = models.FirstOrDefault(model =>
-                ContainsInOrder(model.NormalizedForSegmentedPattern, genderWithLeadingUnderscore, "eventoned"));
+                ContainsInOrder(model.NormalizedForSegmentedPattern, genderToken, "eventoned"));
             if (!string.IsNullOrWhiteSpace(byEventoned.VoiceModelName))
             {
                 return byEventoned.VoiceModelName;
@@ -856,14 +1027,36 @@ public partial class MainWindow : Window
 
     private static bool ContainsInOrder(string source, string first, string second)
     {
-        var firstIndex = source.IndexOf(first, StringComparison.Ordinal);
-        if (firstIndex < 0)
+        if (string.IsNullOrWhiteSpace(source)
+            || string.IsNullOrWhiteSpace(first)
+            || string.IsNullOrWhiteSpace(second))
         {
             return false;
         }
 
-        var secondIndex = source.IndexOf(second, firstIndex + first.Length, StringComparison.Ordinal);
-        return secondIndex >= 0;
+        var searchIndex = 0;
+        while (searchIndex < source.Length)
+        {
+            var firstIndex = source.IndexOf(first, searchIndex, StringComparison.Ordinal);
+            if (firstIndex < 0)
+            {
+                return false;
+            }
+
+            var hasLeftBoundary = firstIndex == 0 || source[firstIndex - 1] == '_';
+            if (hasLeftBoundary)
+            {
+                var secondIndex = source.IndexOf(second, firstIndex + first.Length, StringComparison.Ordinal);
+                if (secondIndex >= 0)
+                {
+                    return true;
+                }
+            }
+
+            searchIndex = firstIndex + first.Length;
+        }
+
+        return false;
     }
 
     private static string NormalizeForContainsMatch(string? value)
@@ -893,9 +1086,9 @@ public partial class MainWindow : Window
         return new string(normalizedChars);
     }
 
-    private static void SaveOverridePayload(CharacterJsonPayload payload)
+    private static void SaveOverridePayload(CharacterJsonPayload payload, string? characterNameForPath = null)
     {
-        var outputPath = BuildCharacterOverrideFilePath(payload.Name);
+        var outputPath = BuildCharacterOverrideFilePath(characterNameForPath ?? payload.Name);
         if (string.IsNullOrWhiteSpace(outputPath))
         {
             return;
@@ -1118,7 +1311,10 @@ public partial class MainWindow : Window
     private void SetDirtyState(bool isDirty)
     {
         _isDirty = isDirty;
-        Title = isDirty ? "Mantella Character Editor *" : "Mantella Character Editor";
+        var modeLabel = _currentMode == TtsProviderMode.XTts ? "xTTS" : "xVA Synth";
+        Title = isDirty
+            ? $"Mantella Character Editor [{modeLabel}] *"
+            : $"Mantella Character Editor [{modeLabel}]";
     }
 
     private bool HandlePendingChanges()
@@ -1157,9 +1353,50 @@ public partial class MainWindow : Window
             }
 
             _xvaSynthDirectory = Path.GetDirectoryName(dialog.FileName);
-            PersistXvaSynthDirectory(_xvaSynthDirectory);
-            UpdateVoiceModelList();
+            PersistSettings();
+            if (_currentMode == TtsProviderMode.XvaSynth)
+            {
+                UpdateVoiceModelList();
+            }
         }
+    }
+
+    private void SetXTtsFolderMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new OpenFileDialog
+        {
+            Title = "Select xTTS executable",
+            Filter = "xTTS executable|xtts-api-server-mantella.exe|Executable files (*.exe)|*.exe",
+            CheckFileExists = true,
+            Multiselect = false
+        };
+
+        if (dialog.ShowDialog(this) == true)
+        {
+            var selectedFileName = Path.GetFileName(dialog.FileName);
+            if (!string.Equals(selectedFileName, "xtts-api-server-mantella.exe", StringComparison.OrdinalIgnoreCase))
+            {
+                MessageBox.Show(this, "Please select the xtts-api-server-mantella.exe file.", "Invalid file", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            _xttsDirectory = Path.GetDirectoryName(dialog.FileName);
+            PersistSettings();
+            if (_currentMode == TtsProviderMode.XTts)
+            {
+                UpdateVoiceModelList();
+            }
+        }
+    }
+
+    private void XvaSynthModeMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        SwitchMode(TtsProviderMode.XvaSynth);
+    }
+
+    private void XTtsModeMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        SwitchMode(TtsProviderMode.XTts);
     }
 
     private void QuitMenuItem_Click(object sender, RoutedEventArgs e)
@@ -1327,6 +1564,12 @@ public partial class MainWindow : Window
         None
     }
 
+    private enum TtsProviderMode
+    {
+        XvaSynth,
+        XTts
+    }
+
     private sealed class CharacterJsonPayload
     {
         [JsonPropertyName("name")]
@@ -1351,5 +1594,7 @@ public partial class MainWindow : Window
     private sealed class UserSettings
     {
         public string? XvaSynthDirectory { get; set; }
+        public string? XTtsDirectory { get; set; }
+        public string? Mode { get; set; }
     }
 }
