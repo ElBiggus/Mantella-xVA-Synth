@@ -15,7 +15,7 @@
 
 *Filter Options*
 * **Has override?** "Yes" only shows characters that already have an override, "No" only shows characters who don't have an override, and "All" shows, er, all.
-* **Voice model status** "Valid" shows characters for which you have a matching installed xVA-Synth voice model, "Invalid" shows characters for which you *don't* have a matching installed model (including ones with no model set), "None" only shows characters that don't have a voice model set, and "All" etc.
+* **Voice model status** "Valid" shows characters for which you have a matching installed xVA-Synth or xTTS voice model (depending on what mode you're in), "Invalid" shows characters for which you *don't* have a matching installed model (including ones with no model set), "None" only shows characters that don't have a voice model set, and "All" etc.
 * **Voice model** This is populated from the Mantella character list, so won't neccessarily reflect the voices you actually have installed.
 * **Gender** A political hot potato in these trying times, but in the context of Skyrim it's self explanatory.
 * **Race** and **Species** See notes below.
