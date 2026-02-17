@@ -16,7 +16,7 @@ This is kind of experimental. Filtering the character list by "Has valid voice m
 
 *Notes*
 * *Species* and *race* are generated from the character list used by Mantella, and the list seems to treat the two things very inconsistently so quite a few values appear in both lists. If anyone wants to clean that up I will award you 100 internet points. (Cue extended arguments over whether Dunmer, Bosmer, and Altmer are different *species* or different *races*.)
-* This is currently quarantined on Nexus for being "sus" (I suspect because it contains an executable and typical mod-related files); BitDefender and VirusTotal give it the thumbs up, but the beauty of GitHub is you can downlaod the code, examine it, and build your own if you don't trust me.
+* This is currently quarantined on Nexus for being "sus" (I suspect because it contains an executable and no typical mod-related files); BitDefender and VirusTotal give it the thumbs up, but the beauty of GitHub is you can download the code, examine it, and build your own if you don't trust me.
 
 *To-do*
 * Support for Fallout 4?
