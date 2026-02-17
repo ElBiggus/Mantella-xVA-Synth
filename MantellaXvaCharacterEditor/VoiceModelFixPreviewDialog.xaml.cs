@@ -16,16 +16,17 @@ public partial class VoiceModelFixPreviewDialog : Window
     private string? _lastSortMember;
     private ListSortDirection _lastSortDirection = ListSortDirection.Ascending;
 
-    public VoiceModelFixPreviewDialog(string summary, IReadOnlyList<VoiceModelFixPreviewRow> previewRows)
+    public VoiceModelFixPreviewDialog(string modeLabel, string summary, IReadOnlyList<VoiceModelFixPreviewRow> previewRows)
     {
         InitializeComponent();
+        ModeTextBlock.Text = $"Mode: {modeLabel}";
         SummaryTextBlock.Text = summary;
         PreviewListView.ItemsSource = previewRows;
     }
 
-    public static void Show(Window owner, string summary, IReadOnlyList<VoiceModelFixPreviewRow> previewRows)
+    public static void Show(Window owner, string modeLabel, string summary, IReadOnlyList<VoiceModelFixPreviewRow> previewRows)
     {
-        var dialog = new VoiceModelFixPreviewDialog(summary, previewRows)
+        var dialog = new VoiceModelFixPreviewDialog(modeLabel, summary, previewRows)
         {
             Owner = owner
         };

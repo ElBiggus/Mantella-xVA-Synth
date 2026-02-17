@@ -5,8 +5,10 @@ D:\Dev\GitHub\Mantella-xVA-Synth\MantellaXvaCharacterEditor\bin\Debug\net8.0-win
 D:\Dev\GitHub\Mantella-xVA-Synth\MantellaXvaCharacterEditor\bin\Debug\net8.0-windows\MantellaXvaCharacterEditor.pdb
 D:\Dev\GitHub\Mantella-xVA-Synth\MantellaXvaCharacterEditor\obj\Debug\net8.0-windows\MainWindow.baml
 D:\Dev\GitHub\Mantella-xVA-Synth\MantellaXvaCharacterEditor\obj\Debug\net8.0-windows\UnsavedChangesDialog.baml
+D:\Dev\GitHub\Mantella-xVA-Synth\MantellaXvaCharacterEditor\obj\Debug\net8.0-windows\VoiceModelFixPreviewDialog.baml
 D:\Dev\GitHub\Mantella-xVA-Synth\MantellaXvaCharacterEditor\obj\Debug\net8.0-windows\MainWindow.g.cs
 D:\Dev\GitHub\Mantella-xVA-Synth\MantellaXvaCharacterEditor\obj\Debug\net8.0-windows\UnsavedChangesDialog.g.cs
+D:\Dev\GitHub\Mantella-xVA-Synth\MantellaXvaCharacterEditor\obj\Debug\net8.0-windows\VoiceModelFixPreviewDialog.g.cs
 D:\Dev\GitHub\Mantella-xVA-Synth\MantellaXvaCharacterEditor\obj\Debug\net8.0-windows\App.g.cs
 D:\Dev\GitHub\Mantella-xVA-Synth\MantellaXvaCharacterEditor\obj\Debug\net8.0-windows\MantellaXvaCharacterEditor_MarkupCompile.cache
 D:\Dev\GitHub\Mantella-xVA-Synth\MantellaXvaCharacterEditor\obj\Debug\net8.0-windows\MantellaXvaCharacterEditor.g.resources
@@ -20,5 +22,3 @@ D:\Dev\GitHub\Mantella-xVA-Synth\MantellaXvaCharacterEditor\obj\Debug\net8.0-win
 D:\Dev\GitHub\Mantella-xVA-Synth\MantellaXvaCharacterEditor\obj\Debug\net8.0-windows\MantellaXvaCharacterEditor.pdb
 D:\Dev\GitHub\Mantella-xVA-Synth\MantellaXvaCharacterEditor\obj\Debug\net8.0-windows\MantellaXvaCharacterEditor.genruntimeconfig.cache
 D:\Dev\GitHub\Mantella-xVA-Synth\MantellaXvaCharacterEditor\obj\Debug\net8.0-windows\ref\MantellaXvaCharacterEditor.dll
-D:\Dev\GitHub\Mantella-xVA-Synth\MantellaXvaCharacterEditor\obj\Debug\net8.0-windows\VoiceModelFixPreviewDialog.baml
-D:\Dev\GitHub\Mantella-xVA-Synth\MantellaXvaCharacterEditor\obj\Debug\net8.0-windows\VoiceModelFixPreviewDialog.g.cs

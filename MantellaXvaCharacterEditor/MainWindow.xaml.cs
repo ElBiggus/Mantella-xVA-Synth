@@ -23,6 +23,8 @@ public partial class MainWindow : Window
     private const string SettingsFolderName = "MantellaXvaCharacterEditor";
     private const string SettingsFileName = "settings.json";
     private const string FilterAllOptionLabel = "-- ALL --";
+    private const string GenderlessFileName = "genderless.txt";
+    private const string MappingsFileName = "mappings.txt";
     private const string NexusModsUrl = "https://www.nexusmods.com/skyrimspecialedition/mods/172719";
     private const string GitHubUrl = "https://github.com/ElBiggus/Mantella-xVA-Synth";
     private const int NameColumnIndex = 0;
@@ -458,10 +460,15 @@ public partial class MainWindow : Window
 
     private string? FindCsvFilePath()
     {
+        return FindDataFilePath(CsvFileName);
+    }
+
+    private static string? FindDataFilePath(string fileName)
+    {
         var current = new DirectoryInfo(AppContext.BaseDirectory);
         while (current is not null)
         {
-            var candidate = Path.Combine(current.FullName, CsvFileName);
+            var candidate = Path.Combine(current.FullName, fileName);
             if (File.Exists(candidate))
             {
                 return candidate;
@@ -470,7 +477,7 @@ public partial class MainWindow : Window
             current = current.Parent;
         }
 
-        var workspaceCandidate = Path.Combine(Environment.CurrentDirectory, CsvFileName);
+        var workspaceCandidate = Path.Combine(Environment.CurrentDirectory, fileName);
         return File.Exists(workspaceCandidate) ? workspaceCandidate : null;
     }
 
@@ -856,12 +863,27 @@ public partial class MainWindow : Window
 
     private void PreviewInvalidVoiceModelsMenuItem_Click(object sender, RoutedEventArgs e)
     {
+        PreviewVoiceModelFixes(VoiceModelFixMode.Standard);
+    }
+
+    private void PreviewInvalidVoiceModelsFuzzyMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        PreviewVoiceModelFixes(VoiceModelFixMode.Fuzzy);
+    }
+
+    private void PreviewVoiceModelFixes(VoiceModelFixMode mode)
+    {
         if (!TryGetVoiceModelFixInputs(out var models, out var csvByName, out var visibleCharacterNames))
         {
             return;
         }
 
-        var candidates = BuildVoiceModelFixCandidates(models, csvByName, visibleCharacterNames, out var skippedCount, out var alreadyValidOverrideCount);
+        if (!TryGetVoiceModelFuzzyOptions(mode, out var fuzzyOptions))
+        {
+            return;
+        }
+
+        var candidates = BuildVoiceModelFixCandidates(models, csvByName, visibleCharacterNames, mode, fuzzyOptions, out var skippedCount, out var alreadyValidOverrideCount);
         var summaryMessage = $"Would update {candidates.Count} voice models";
         if (skippedCount > 0)
         {
@@ -877,15 +899,30 @@ public partial class MainWindow : Window
             .Select(candidate => new VoiceModelFixPreviewRow(candidate.CharacterName, candidate.CurrentVoiceModel, candidate.ResolvedVoiceModel))
             .ToList();
 
-        VoiceModelFixPreviewDialog.Show(this, summaryMessage, previewItems);
+        var modeLabel = mode == VoiceModelFixMode.Fuzzy ? "Fuzzy" : "Standard";
+        VoiceModelFixPreviewDialog.Show(this, modeLabel, summaryMessage, previewItems);
     }
 
     private void FixInvalidVoiceModelsMenuItem_Click(object sender, RoutedEventArgs e)
     {
+        FixVoiceModels(VoiceModelFixMode.Standard);
+    }
+
+    private void FixInvalidVoiceModelsFuzzyMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        FixVoiceModels(VoiceModelFixMode.Fuzzy);
+    }
+
+    private void FixVoiceModels(VoiceModelFixMode mode)
+    {
+        var actionLabel = mode == VoiceModelFixMode.Fuzzy
+            ? "Fix invalid voice models (Fuzzy)"
+            : "Fix invalid voice models";
+
         var confirmation = MessageBox.Show(
             this,
             "This action will create/amend overrides for all characters currently shown in the list.",
-            "Fix invalid voice models",
+            actionLabel,
             MessageBoxButton.OKCancel,
             MessageBoxImage.Warning);
 
@@ -899,7 +936,12 @@ public partial class MainWindow : Window
             return;
         }
 
-        var candidates = BuildVoiceModelFixCandidates(models, csvByName, visibleCharacterNames, out var skippedCount, out var alreadyValidOverrideCount);
+        if (!TryGetVoiceModelFuzzyOptions(mode, out var fuzzyOptions))
+        {
+            return;
+        }
+
+        var candidates = BuildVoiceModelFixCandidates(models, csvByName, visibleCharacterNames, mode, fuzzyOptions, out var skippedCount, out var alreadyValidOverrideCount);
 
         foreach (var candidate in candidates)
         {
@@ -922,7 +964,108 @@ public partial class MainWindow : Window
             summaryMessage += $"; skipped {alreadyValidOverrideCount} entries with valid override voice models";
         }
 
-        MessageBox.Show(this, summaryMessage, "Fix invalid voice models", MessageBoxButton.OK, MessageBoxImage.Information);
+        MessageBox.Show(this, summaryMessage, actionLabel, MessageBoxButton.OK, MessageBoxImage.Information);
+    }
+
+    private bool TryGetVoiceModelFuzzyOptions(VoiceModelFixMode mode, out VoiceModelFuzzyOptions options)
+    {
+        options = VoiceModelFuzzyOptions.Empty;
+        if (mode != VoiceModelFixMode.Fuzzy)
+        {
+            return true;
+        }
+
+        var genderlessFilePath = FindDataFilePath(GenderlessFileName);
+        var mappingsFilePath = FindDataFilePath(MappingsFileName);
+
+        var genderlessTokens = ReadGenderlessTokens(genderlessFilePath);
+        var mappingRules = ReadMappingRules(mappingsFilePath);
+
+        options = new VoiceModelFuzzyOptions(genderlessTokens, mappingRules);
+        return true;
+    }
+
+    private static HashSet<string> ReadGenderlessTokens(string? filePath)
+    {
+        var genderlessTokens = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        if (string.IsNullOrWhiteSpace(filePath) || !File.Exists(filePath))
+        {
+            return genderlessTokens;
+        }
+
+        foreach (var rawLine in File.ReadLines(filePath))
+        {
+            var token = NormalizeForContainsMatch(rawLine);
+            if (!string.IsNullOrWhiteSpace(token))
+            {
+                _ = genderlessTokens.Add(token);
+            }
+        }
+
+        return genderlessTokens;
+    }
+
+    private static List<VoiceModelMappingRule> ReadMappingRules(string? filePath)
+    {
+        var mappingRules = new List<VoiceModelMappingRule>();
+        if (string.IsNullOrWhiteSpace(filePath) || !File.Exists(filePath))
+        {
+            return mappingRules;
+        }
+
+        foreach (var rawLine in File.ReadLines(filePath))
+        {
+            var line = rawLine.Trim();
+            if (string.IsNullOrWhiteSpace(line))
+            {
+                continue;
+            }
+
+            var commentIndex = line.IndexOf('#');
+            if (commentIndex >= 0)
+            {
+                line = line[..commentIndex].Trim();
+            }
+
+            if (string.IsNullOrWhiteSpace(line))
+            {
+                continue;
+            }
+
+            if (TryParseMappingRule(line, '*', true, out var twoWayRule))
+            {
+                mappingRules.Add(twoWayRule);
+                continue;
+            }
+
+            if (TryParseMappingRule(line, '>', false, out var oneWayRule))
+            {
+                mappingRules.Add(oneWayRule);
+            }
+        }
+
+        return mappingRules;
+    }
+
+    private static bool TryParseMappingRule(string line, char separator, bool isTwoWay, out VoiceModelMappingRule rule)
+    {
+        rule = default;
+
+        var separatorIndex = line.IndexOf(separator);
+        if (separatorIndex <= 0 || separatorIndex >= line.Length - 1)
+        {
+            return false;
+        }
+
+        var first = NormalizeForContainsMatch(line[..separatorIndex]);
+        var second = NormalizeForContainsMatch(line[(separatorIndex + 1)..]);
+        if (string.IsNullOrWhiteSpace(first) || string.IsNullOrWhiteSpace(second))
+        {
+            return false;
+        }
+
+        rule = new VoiceModelMappingRule(first, second, isTwoWay);
+        return true;
     }
 
     private bool TryGetVoiceModelFixInputs(
@@ -984,6 +1127,8 @@ public partial class MainWindow : Window
         IReadOnlyList<VoiceModelCandidate> models,
         IReadOnlyDictionary<string, CharacterListEntry> csvByName,
         IReadOnlyList<string> visibleCharacterNames,
+        VoiceModelFixMode mode,
+        VoiceModelFuzzyOptions fuzzyOptions,
         out int skippedCount,
         out int alreadyValidOverrideCount)
     {
@@ -1028,7 +1173,9 @@ public partial class MainWindow : Window
             var resolveRace = string.IsNullOrWhiteSpace(payload.Race) ? csvEntry.Race : payload.Race;
             var resolveSpecies = string.IsNullOrWhiteSpace(payload.Species) ? csvEntry.Species : payload.Species;
 
-            var resolvedModel = ResolveVoiceModelName(resolveName, resolveGender, resolveRace, resolveSpecies, models);
+            var resolvedModel = mode == VoiceModelFixMode.Fuzzy
+                ? ResolveVoiceModelNameFuzzy(resolveName, resolveGender, resolveRace, resolveSpecies, models, fuzzyOptions)
+                : ResolveVoiceModelName(resolveName, resolveGender, resolveRace, resolveSpecies, models);
             if (string.IsNullOrWhiteSpace(resolvedModel))
             {
                 skippedCount++;
@@ -1159,6 +1306,169 @@ public partial class MainWindow : Window
         }
 
         return null;
+    }
+
+    private static string? ResolveVoiceModelNameFuzzy(
+        string characterName,
+        string gender,
+        string race,
+        string species,
+        IReadOnlyList<VoiceModelCandidate> models,
+        VoiceModelFuzzyOptions fuzzyOptions)
+    {
+        var normalizedName = NormalizeForContainsMatch(characterName);
+        var normalizedGender = NormalizeForContainsMatch(gender);
+        var normalizedRace = NormalizeForContainsMatch(race);
+        var normalizedSpecies = NormalizeForContainsMatch(species);
+
+        if (!string.IsNullOrWhiteSpace(normalizedName))
+        {
+            var byName = models.FirstOrDefault(model => model.NormalizedForContains.Contains(normalizedName, StringComparison.Ordinal));
+            if (!string.IsNullOrWhiteSpace(byName.VoiceModelName))
+            {
+                return byName.VoiceModelName;
+            }
+        }
+
+        var byRace = TryResolveByAttribute(
+            models,
+            normalizedGender,
+            normalizedRace,
+            ShouldCheckWithoutGender(normalizedRace, normalizedRace, fuzzyOptions));
+        if (!string.IsNullOrWhiteSpace(byRace))
+        {
+            return byRace;
+        }
+
+        var bySpecies = TryResolveByAttribute(
+            models,
+            normalizedGender,
+            normalizedSpecies,
+            ShouldCheckWithoutGender(normalizedSpecies, normalizedSpecies, fuzzyOptions));
+        if (!string.IsNullOrWhiteSpace(bySpecies))
+        {
+            return bySpecies;
+        }
+
+        var byMappedRace = ResolveVoiceModelFromMappings(models, normalizedGender, normalizedRace, fuzzyOptions);
+        if (!string.IsNullOrWhiteSpace(byMappedRace))
+        {
+            return byMappedRace;
+        }
+
+        var byMappedSpecies = ResolveVoiceModelFromMappings(models, normalizedGender, normalizedSpecies, fuzzyOptions);
+        if (!string.IsNullOrWhiteSpace(byMappedSpecies))
+        {
+            return byMappedSpecies;
+        }
+
+        return null;
+    }
+
+    private static string? ResolveVoiceModelFromMappings(
+        IReadOnlyList<VoiceModelCandidate> models,
+        string normalizedGender,
+        string sourceAttribute,
+        VoiceModelFuzzyOptions fuzzyOptions)
+    {
+        if (string.IsNullOrWhiteSpace(sourceAttribute) || fuzzyOptions.MappingRules.Count == 0)
+        {
+            return null;
+        }
+
+        foreach (var mappedAttribute in EnumerateMappedAttributesInOrder(sourceAttribute, fuzzyOptions.MappingRules))
+        {
+            var mappedMatch = TryResolveByAttribute(
+                models,
+                normalizedGender,
+                mappedAttribute,
+                ShouldCheckWithoutGender(sourceAttribute, mappedAttribute, fuzzyOptions));
+            if (!string.IsNullOrWhiteSpace(mappedMatch))
+            {
+                return mappedMatch;
+            }
+        }
+
+        return null;
+    }
+
+    private static string? TryResolveByAttribute(
+        IReadOnlyList<VoiceModelCandidate> models,
+        string normalizedGender,
+        string normalizedAttribute,
+        bool allowWithoutGender)
+    {
+        if (string.IsNullOrWhiteSpace(normalizedAttribute))
+        {
+            return null;
+        }
+
+        if (!string.IsNullOrWhiteSpace(normalizedGender))
+        {
+            var byGenderAttribute = models.FirstOrDefault(model =>
+                ContainsInOrder(model.NormalizedForSegmentedPattern, normalizedGender, normalizedAttribute));
+            if (!string.IsNullOrWhiteSpace(byGenderAttribute.VoiceModelName))
+            {
+                return byGenderAttribute.VoiceModelName;
+            }
+        }
+
+        if (!allowWithoutGender)
+        {
+            return null;
+        }
+
+        var byAttributeOnly = models.FirstOrDefault(model =>
+            model.NormalizedForContains.Contains(normalizedAttribute, StringComparison.Ordinal));
+        return string.IsNullOrWhiteSpace(byAttributeOnly.VoiceModelName)
+            ? null
+            : byAttributeOnly.VoiceModelName;
+    }
+
+    private static bool ShouldCheckWithoutGender(
+        string sourceAttribute,
+        string candidateAttribute,
+        VoiceModelFuzzyOptions fuzzyOptions)
+    {
+        if (string.IsNullOrWhiteSpace(sourceAttribute) && string.IsNullOrWhiteSpace(candidateAttribute))
+        {
+            return false;
+        }
+
+        return fuzzyOptions.GenderlessTokens.Contains(sourceAttribute)
+            || fuzzyOptions.GenderlessTokens.Contains(candidateAttribute);
+    }
+
+    private static IEnumerable<string> EnumerateMappedAttributesInOrder(
+        string sourceAttribute,
+        IReadOnlyList<VoiceModelMappingRule> mappingRules)
+    {
+        if (string.IsNullOrWhiteSpace(sourceAttribute) || mappingRules.Count == 0)
+        {
+            yield break;
+        }
+
+        var yielded = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var mappingRule in mappingRules)
+        {
+            if (string.Equals(sourceAttribute, mappingRule.FirstToken, StringComparison.OrdinalIgnoreCase))
+            {
+                if (yielded.Add(mappingRule.SecondToken))
+                {
+                    yield return mappingRule.SecondToken;
+                }
+
+                continue;
+            }
+
+            if (mappingRule.IsTwoWay
+                && string.Equals(sourceAttribute, mappingRule.SecondToken, StringComparison.OrdinalIgnoreCase)
+                && yielded.Add(mappingRule.FirstToken))
+            {
+                yield return mappingRule.FirstToken;
+            }
+        }
     }
 
     private static bool ContainsInOrder(string source, string first, string second)
@@ -1791,6 +2101,18 @@ public partial class MainWindow : Window
         string CurrentVoiceModel,
         string ResolvedVoiceModel);
 
+    private readonly record struct VoiceModelMappingRule(
+        string FirstToken,
+        string SecondToken,
+        bool IsTwoWay);
+
+    private readonly record struct VoiceModelFuzzyOptions(
+        HashSet<string> GenderlessTokens,
+        List<VoiceModelMappingRule> MappingRules)
+    {
+        public static VoiceModelFuzzyOptions Empty => new(new HashSet<string>(StringComparer.OrdinalIgnoreCase), new List<VoiceModelMappingRule>());
+    }
+
     private enum FilterSelection
     {
         All,
@@ -1818,6 +2140,12 @@ public partial class MainWindow : Window
     {
         XvaSynth,
         XTts
+    }
+
+    private enum VoiceModelFixMode
+    {
+        Standard,
+        Fuzzy
     }
 
     private enum DisplayedValueSource

@@ -1,0 +1,10 @@
+Daedra
+Dremora
+Beast
+Canine
+Demon
+Dragon
+Horse
+Automaton
+Deer
+Skeleton

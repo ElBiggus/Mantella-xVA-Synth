@@ -20,6 +20,8 @@
                 <MenuItem Header="Set xTTS folder" Click="SetXTtsFolderMenuItem_Click" />
                 <MenuItem Header="Preview invalid voice model fixes..." Click="PreviewInvalidVoiceModelsMenuItem_Click" />
                 <MenuItem Header="Fix invalid voice models..." Click="FixInvalidVoiceModelsMenuItem_Click" />
+                <MenuItem Header="Preview invalid voice model fixes (Fuzzy)..." Click="PreviewInvalidVoiceModelsFuzzyMenuItem_Click" />
+                <MenuItem Header="Fix invalid voice models (Fuzzy)..." Click="FixInvalidVoiceModelsFuzzyMenuItem_Click" />
                 <Separator />
                 <MenuItem Header="Quit" Click="QuitMenuItem_Click" />
             </MenuItem>

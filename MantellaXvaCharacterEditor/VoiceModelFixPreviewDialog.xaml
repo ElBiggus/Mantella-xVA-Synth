@@ -11,17 +11,23 @@
     <Grid Margin="14">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <TextBlock x:Name="SummaryTextBlock"
+        <TextBlock x:Name="ModeTextBlock"
                    Grid.Row="0"
+                   Margin="0,0,0,6"
+                   FontWeight="SemiBold" />
+
+        <TextBlock x:Name="SummaryTextBlock"
+                   Grid.Row="1"
                    Margin="0,0,0,10"
                    TextWrapping="Wrap" />
 
         <ListView x:Name="PreviewListView"
-                  Grid.Row="1"
+                  Grid.Row="2"
                   GridViewColumnHeader.Click="GridViewColumnHeader_Click"
                   ScrollViewer.VerticalScrollBarVisibility="Auto"
                   ScrollViewer.HorizontalScrollBarVisibility="Auto">
@@ -46,7 +52,7 @@
             </ListView.View>
         </ListView>
 
-        <StackPanel Grid.Row="2"
+        <StackPanel Grid.Row="3"
                     Orientation="Horizontal"
                     HorizontalAlignment="Right"
                     Margin="0,12,0,0">

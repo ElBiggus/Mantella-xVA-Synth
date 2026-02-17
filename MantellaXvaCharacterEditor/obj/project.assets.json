@@ -12,7 +12,7 @@
     "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages": {}
   },
   "project": {
-    "version": "0.3.0",
+    "version": "0.4.0",
     "restore": {
       "projectUniqueName": "D:\\Dev\\GitHub\\Mantella-xVA-Synth\\MantellaXvaCharacterEditor\\MantellaXvaCharacterEditor.csproj",
       "projectName": "MantellaXvaCharacterEditor",
@@ -76,7 +76,7 @@
             "privateAssets": "none"
           }
         },
-        "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.102/PortableRuntimeIdentifierGraph.json"
+        "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.103/PortableRuntimeIdentifierGraph.json"
       }
     }
   }

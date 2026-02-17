@@ -1,0 +1,21 @@
+Dunmer * DarkElf
+Bosmer * WoodElf
+Altmer * HighElf
+Orsimer * Orc
+Dog * Canine
+Dunmer > Elf
+Bosmer > Elf
+Altmer > Elf
+SnowElf > Elf
+Redguard > Human
+Nord > Human
+Imperial > Human
+Khajit-Orc > Khajit
+Nord (Vampire) > Nord
+Breton > Human
+Dremora > Daedra
+Daedra > Beast
+Dremora > Beast
+Demon > Beast
+Dog > Beast
+Canine > Beast
