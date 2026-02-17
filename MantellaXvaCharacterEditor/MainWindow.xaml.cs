@@ -9,6 +9,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Media;
 
 namespace MantellaXvaCharacterEditor;
 
@@ -40,6 +41,7 @@ public partial class MainWindow : Window
     private bool _isDirty;
     private string? _selectedCharacterName;
     private CharacterFormData _lastSavedOrLoadedState = CharacterFormData.Empty;
+    private DisplayedValueSource _displayedValueSource = DisplayedValueSource.None;
 
     private List<string> _characterNames = new();
     private List<string> _voiceModelFilterValues = new();
@@ -52,6 +54,7 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        VoiceModelComboBox.AddHandler(TextBox.TextChangedEvent, new TextChangedEventHandler(VoiceModelComboBox_TextChanged));
         LoadInitialData();
     }
 
@@ -66,6 +69,7 @@ public partial class MainWindow : Window
         RefreshCsvDerivedLists();
         UpdateVoiceModelList();
         UpdateLoadExistingOverrideButtonState();
+        SetDisplayedValueSource(DisplayedValueSource.None);
         SetDirtyState(false);
     }
 
@@ -105,8 +109,7 @@ public partial class MainWindow : Window
 
     private void UpdateLoadExistingOverrideButtonState()
     {
-        var overridePath = BuildCharacterOverrideFilePath(_selectedCharacterName);
-        LoadExistingOverrideButton.IsEnabled = !string.IsNullOrWhiteSpace(overridePath) && File.Exists(overridePath);
+        LoadExistingOverrideButton.IsEnabled = true;
     }
 
     private UserSettings LoadSettings()
@@ -211,7 +214,25 @@ public partial class MainWindow : Window
 
         _lastSavedOrLoadedState = CaptureCurrentFormState();
         UpdateLoadExistingOverrideButtonState();
+        SetDisplayedValueSource(DisplayedValueSource.None);
         SetDirtyState(false);
+    }
+
+    private void SetDisplayedValueSource(DisplayedValueSource source)
+    {
+        _displayedValueSource = source;
+
+        if (DisplayedValueSourceTextBlock is null)
+        {
+            return;
+        }
+
+        DisplayedValueSourceTextBlock.Text = source switch
+        {
+            DisplayedValueSource.Override => "Override",
+            DisplayedValueSource.Default => "Default",
+            _ => string.Empty
+        };
     }
 
     private void SwitchMode(TtsProviderMode nextMode)
@@ -249,13 +270,27 @@ public partial class MainWindow : Window
                 continue;
             }
 
+            var overrideFilePath = BuildCharacterOverrideFilePath(name);
+            var hasOverride = !string.IsNullOrWhiteSpace(overrideFilePath) && File.Exists(overrideFilePath);
+
             charactersByName[name] = new CharacterListEntry(
                 name,
                 GetColumnValue(row, VoiceModelColumnIndex),
                 GetColumnValue(row, BioColumnIndex),
                 GetColumnValue(row, RaceColumnIndex),
                 GetColumnValue(row, GenderColumnIndex),
-                GetColumnValue(row, SpeciesColumnIndex));
+                GetColumnValue(row, SpeciesColumnIndex),
+                hasOverride);
+        }
+
+        foreach (var overrideEntry in GetOverrideCharacterEntries())
+        {
+            if (charactersByName.ContainsKey(overrideEntry.Name))
+            {
+                continue;
+            }
+
+            charactersByName[overrideEntry.Name] = overrideEntry;
         }
 
         _allCharacters = charactersByName.Values
@@ -266,22 +301,22 @@ public partial class MainWindow : Window
             .Select(character => character.Name)
             .ToList();
 
-        _speciesValues = rows
-            .Select(row => GetColumnValue(row, SpeciesColumnIndex))
+        _speciesValues = _allCharacters
+            .Select(character => character.Species)
             .Where(value => !string.IsNullOrWhiteSpace(value))
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .OrderBy(value => value, StringComparer.CurrentCultureIgnoreCase)
             .ToList();
 
-        _voiceModelFilterValues = rows
-            .Select(row => GetColumnValue(row, VoiceModelColumnIndex))
+        _voiceModelFilterValues = _allCharacters
+            .Select(character => character.VoiceModel)
             .Where(value => !string.IsNullOrWhiteSpace(value))
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .OrderBy(value => value, StringComparer.CurrentCultureIgnoreCase)
             .ToList();
 
-        _raceValues = rows
-            .Select(row => GetColumnValue(row, RaceColumnIndex))
+        _raceValues = _allCharacters
+            .Select(character => character.Race)
             .Where(value => !string.IsNullOrWhiteSpace(value))
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .OrderBy(value => value, StringComparer.CurrentCultureIgnoreCase)
@@ -292,6 +327,70 @@ public partial class MainWindow : Window
 
         SpeciesComboBox.ItemsSource = _speciesValues;
         RaceComboBox.ItemsSource = _raceValues;
+    }
+
+    private IEnumerable<CharacterListEntry> GetOverrideCharacterEntries()
+    {
+        var overrideDirectory = GetCharacterOverridesDirectoryPath();
+        if (!Directory.Exists(overrideDirectory))
+        {
+            return Enumerable.Empty<CharacterListEntry>();
+        }
+
+        var entries = new List<CharacterListEntry>();
+        foreach (var overridePath in Directory.EnumerateFiles(overrideDirectory, "*.json", System.IO.SearchOption.TopDirectoryOnly))
+        {
+            if (!TryReadOverridePayloadFromPath(overridePath, out var payload))
+            {
+                continue;
+            }
+
+            var fallbackName = Path.GetFileNameWithoutExtension(overridePath) ?? string.Empty;
+            var normalizedFallbackName = fallbackName.Replace('_', ' ').Trim();
+            var characterName = string.IsNullOrWhiteSpace(payload.Name) ? normalizedFallbackName : payload.Name.Trim();
+
+            if (string.IsNullOrWhiteSpace(characterName))
+            {
+                continue;
+            }
+
+            entries.Add(new CharacterListEntry(
+                characterName,
+                payload.VoiceModel,
+                payload.Bio,
+                payload.Race,
+                payload.Gender,
+                payload.Species,
+                true));
+        }
+
+        return entries;
+    }
+
+    private static bool TryReadOverridePayloadFromPath(string overridePath, out CharacterJsonPayload payload)
+    {
+        payload = new CharacterJsonPayload();
+        if (string.IsNullOrWhiteSpace(overridePath) || !File.Exists(overridePath))
+        {
+            return false;
+        }
+
+        try
+        {
+            var json = File.ReadAllText(overridePath);
+            var existingPayload = JsonSerializer.Deserialize<CharacterJsonPayload>(json);
+            if (existingPayload is null)
+            {
+                return false;
+            }
+
+            payload = existingPayload;
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     private List<string[]> ReadCsvRows()
@@ -377,7 +476,7 @@ public partial class MainWindow : Window
 
     private void UpdateVoiceModelList()
     {
-        var selectedVoice = VoiceModelComboBox.SelectedItem?.ToString();
+        var selectedVoice = GetComboBoxDisplayValue(VoiceModelComboBox);
         var modelNames = GetVoiceModelNames(_currentMode, GetCurrentProviderDirectory());
         var fallbackLabel = GetVoiceModelFallbackLabel(_currentMode);
         _voiceModelNames = modelNames
@@ -391,16 +490,55 @@ public partial class MainWindow : Window
 
         VoiceModelComboBox.ItemsSource = modelNames;
 
-        if (!string.IsNullOrWhiteSpace(selectedVoice) && modelNames.Contains(selectedVoice))
+        if (!string.IsNullOrWhiteSpace(selectedVoice) && modelNames.Contains(selectedVoice, StringComparer.CurrentCultureIgnoreCase))
         {
-            VoiceModelComboBox.SelectedItem = selectedVoice;
+            SetComboValue(VoiceModelComboBox, selectedVoice);
         }
         else
         {
-            VoiceModelComboBox.SelectedIndex = modelNames.Count > 0 ? 0 : -1;
+            VoiceModelComboBox.SelectedItem = null;
+            VoiceModelComboBox.Text = string.Empty;
+
+            if (!string.IsNullOrWhiteSpace(selectedVoice))
+            {
+                VoiceModelComboBox.Text = selectedVoice;
+            }
         }
 
+        UpdateVoiceModelValidationState();
+
         ApplyCharacterFilters();
+    }
+
+    private bool IsInvalidVoiceModelEntry(string voiceModel)
+    {
+        if (string.IsNullOrWhiteSpace(voiceModel))
+        {
+            return false;
+        }
+
+        var voiceModelKey = NormalizeForContainsMatch(voiceModel);
+        if (string.IsNullOrWhiteSpace(voiceModelKey))
+        {
+            return true;
+        }
+
+        return !_voiceModelNameKeys.Contains(voiceModelKey);
+    }
+
+    private void UpdateVoiceModelValidationState()
+    {
+        var voiceModel = GetComboBoxDisplayValue(VoiceModelComboBox);
+        var foreground = IsInvalidVoiceModelEntry(voiceModel)
+            ? Brushes.Red
+            : SystemColors.ControlTextBrush;
+
+        VoiceModelComboBox.Foreground = SystemColors.ControlTextBrush;
+
+        if (VoiceModelComboBox.Template.FindName("PART_EditableTextBox", VoiceModelComboBox) is TextBox editableTextBox)
+        {
+            editableTextBox.Foreground = foreground;
+        }
     }
 
     private void ApplyCharacterFilters()
@@ -421,8 +559,8 @@ public partial class MainWindow : Window
         var filteredCharacterNames = _allCharacters
             .Where(character =>
                 MatchesNameFilter(character.Name, nameFilter)
-                && MatchesHasOverrideFilter(character.Name, hasOverrideFilter)
-                && MatchesVoiceModelStatusFilter(character.VoiceModel, voiceModelStatusFilter)
+                && MatchesHasOverrideFilter(character, hasOverrideFilter)
+                && MatchesVoiceModelStatusFilter(character, voiceModelStatusFilter)
                 && MatchesExactFilter(character.VoiceModel, voiceModelFilter)
                 && MatchesGenderFilter(character.Gender, genderFilter)
                 && MatchesExactFilter(character.Race, raceFilter)
@@ -549,16 +687,14 @@ public partial class MainWindow : Window
         return characterName.Contains(nameFilter, StringComparison.CurrentCultureIgnoreCase);
     }
 
-    private bool MatchesHasOverrideFilter(string characterName, FilterSelection hasOverrideFilter)
+    private static bool MatchesHasOverrideFilter(CharacterListEntry character, FilterSelection hasOverrideFilter)
     {
         if (hasOverrideFilter == FilterSelection.All)
         {
             return true;
         }
 
-        var overrideFilePath = BuildCharacterOverrideFilePath(characterName);
-        var hasOverride = !string.IsNullOrWhiteSpace(overrideFilePath) && File.Exists(overrideFilePath);
-        return hasOverrideFilter == FilterSelection.Yes ? hasOverride : !hasOverride;
+        return hasOverrideFilter == FilterSelection.Yes ? character.HasOverride : !character.HasOverride;
     }
 
     private VoiceModelStatusFilterSelection GetVoiceModelStatusFilterSelection()
@@ -581,12 +717,14 @@ public partial class MainWindow : Window
         return VoiceModelStatusFilterSelection.All;
     }
 
-    private bool MatchesVoiceModelStatusFilter(string voiceModel, VoiceModelStatusFilterSelection voiceModelStatusFilter)
+    private bool MatchesVoiceModelStatusFilter(CharacterListEntry character, VoiceModelStatusFilterSelection voiceModelStatusFilter)
     {
         if (voiceModelStatusFilter == VoiceModelStatusFilterSelection.All)
         {
             return true;
         }
+
+        var voiceModel = GetVoiceModelForStatusFilter(character);
 
         var hasVoiceModel = !string.IsNullOrWhiteSpace(voiceModel);
         var voiceModelKey = NormalizeForContainsMatch(voiceModel);
@@ -601,6 +739,21 @@ public partial class MainWindow : Window
             VoiceModelStatusFilterSelection.None => !hasVoiceModel,
             _ => true
         };
+    }
+
+    private string GetVoiceModelForStatusFilter(CharacterListEntry character)
+    {
+        if (!character.HasOverride)
+        {
+            return character.VoiceModel;
+        }
+
+        if (TryLoadOverridePayload(character.Name, out var payload))
+        {
+            return payload.VoiceModel;
+        }
+
+        return character.VoiceModel;
     }
 
     private static bool MatchesGenderFilter(string gender, GenderFilterSelection genderFilter)
@@ -810,7 +963,8 @@ public partial class MainWindow : Window
                 GetColumnValue(row, BioColumnIndex),
                 GetColumnValue(row, RaceColumnIndex),
                 GetColumnValue(row, GenderColumnIndex),
-                GetColumnValue(row, SpeciesColumnIndex)))
+                GetColumnValue(row, SpeciesColumnIndex),
+                false))
             .Where(entry => !string.IsNullOrWhiteSpace(entry.Name))
             .GroupBy(entry => entry.Name, StringComparer.OrdinalIgnoreCase)
             .ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
@@ -901,26 +1055,8 @@ public partial class MainWindow : Window
 
     private bool TryLoadOverridePayload(string characterName, out CharacterJsonPayload payload)
     {
-        payload = new CharacterJsonPayload();
         var overridePath = BuildCharacterOverrideFilePath(characterName);
-        if (!string.IsNullOrWhiteSpace(overridePath) && File.Exists(overridePath))
-        {
-            try
-            {
-                var json = File.ReadAllText(overridePath);
-                var existingPayload = JsonSerializer.Deserialize<CharacterJsonPayload>(json);
-                if (existingPayload is not null)
-                {
-                    payload = existingPayload;
-                    return true;
-                }
-            }
-            catch
-            {
-            }
-        }
-
-        return false;
+        return TryReadOverridePayloadFromPath(overridePath ?? string.Empty, out payload);
     }
 
     private static CharacterJsonPayload CreatePayloadFromCsv(CharacterListEntry csvEntry)
@@ -1135,30 +1271,66 @@ public partial class MainWindow : Window
 
     private void LoadCharacter(string characterName)
     {
+        var hasCsv = TryGetCsvCharacterEntry(characterName, out var csvEntry);
+        var hasOverride = TryLoadOverridePayload(characterName, out var overridePayload);
+
+        if (!hasCsv && !hasOverride)
+        {
+            return;
+        }
+
+        var entryToLoad = hasOverride
+            ? new CharacterListEntry(
+                string.IsNullOrWhiteSpace(overridePayload.Name) ? characterName : overridePayload.Name,
+                overridePayload.VoiceModel,
+                overridePayload.Bio,
+                overridePayload.Race,
+                overridePayload.Gender,
+                overridePayload.Species,
+                true)
+            : csvEntry;
+
+        _isLoadingFields = true;
+
+        CharacterNameTextBox.Text = entryToLoad.Name;
+        BioTextBox.Text = entryToLoad.Bio;
+
+        SetComboValue(VoiceModelComboBox, entryToLoad.VoiceModel);
+        SetComboValue(GenderComboBox, entryToLoad.Gender);
+        SetComboValue(SpeciesComboBox, entryToLoad.Species);
+        SetComboValue(RaceComboBox, entryToLoad.Race);
+
+        _isLoadingFields = false;
+        _selectedCharacterName = characterName;
+        SetDisplayedValueSource(hasOverride ? DisplayedValueSource.Override : DisplayedValueSource.Default);
+        _lastSavedOrLoadedState = CaptureCurrentFormState();
+        UpdateLoadExistingOverrideButtonState();
+        SetDirtyState(false);
+    }
+
+    private bool TryGetCsvCharacterEntry(string characterName, out CharacterListEntry entry)
+    {
+        entry = default;
+
         var rows = ReadCsvRows();
         var row = rows.FirstOrDefault(item =>
             string.Equals(GetColumnValue(item, NameColumnIndex), characterName, StringComparison.OrdinalIgnoreCase));
 
         if (row is null)
         {
-            return;
+            return false;
         }
 
-        _isLoadingFields = true;
+        entry = new CharacterListEntry(
+            GetColumnValue(row, NameColumnIndex),
+            GetColumnValue(row, VoiceModelColumnIndex),
+            GetColumnValue(row, BioColumnIndex),
+            GetColumnValue(row, RaceColumnIndex),
+            GetColumnValue(row, GenderColumnIndex),
+            GetColumnValue(row, SpeciesColumnIndex),
+            false);
 
-        CharacterNameTextBox.Text = GetColumnValue(row, NameColumnIndex);
-        BioTextBox.Text = GetColumnValue(row, BioColumnIndex);
-
-        SetComboValue(VoiceModelComboBox, GetColumnValue(row, VoiceModelColumnIndex));
-        SetComboValue(GenderComboBox, GetColumnValue(row, GenderColumnIndex));
-        SetComboValue(SpeciesComboBox, GetColumnValue(row, SpeciesColumnIndex));
-        SetComboValue(RaceComboBox, GetColumnValue(row, RaceColumnIndex));
-
-        _isLoadingFields = false;
-        _selectedCharacterName = characterName;
-        _lastSavedOrLoadedState = CaptureCurrentFormState();
-        UpdateLoadExistingOverrideButtonState();
-        SetDirtyState(false);
+        return true;
     }
 
     private static void SetComboValue(ComboBox comboBox, string value)
@@ -1182,7 +1354,7 @@ public partial class MainWindow : Window
         if (item is null)
         {
             comboBox.SelectedItem = null;
-            comboBox.Text = string.Empty;
+            comboBox.Text = comboBox.IsEditable ? value : string.Empty;
         }
         else
         {
@@ -1207,7 +1379,7 @@ public partial class MainWindow : Window
         var payload = new CharacterJsonPayload
         {
             Name = name,
-            VoiceModel = VoiceModelComboBox.SelectedItem?.ToString() ?? string.Empty,
+            VoiceModel = GetComboBoxDisplayValue(VoiceModelComboBox),
             Bio = BioTextBox.Text,
             Race = RaceComboBox.SelectedItem?.ToString() ?? string.Empty,
             Gender = GetComboBoxDisplayValue(GenderComboBox),
@@ -1237,9 +1409,64 @@ public partial class MainWindow : Window
         _lastSavedOrLoadedState = CaptureCurrentFormState();
         SetDirtyState(false);
         _selectedCharacterName = name;
+        SetDisplayedValueSource(DisplayedValueSource.Override);
+        UpsertCharacterInList(new CharacterListEntry(
+            name,
+            payload.VoiceModel,
+            payload.Bio,
+            payload.Race,
+            payload.Gender,
+            payload.Species,
+            true));
         UpdateLoadExistingOverrideButtonState();
         ApplyCharacterFilters();
         return true;
+    }
+
+    private void UpsertCharacterInList(CharacterListEntry updatedEntry)
+    {
+        var existingIndex = _allCharacters.FindIndex(character =>
+            string.Equals(character.Name, updatedEntry.Name, StringComparison.OrdinalIgnoreCase));
+
+        if (existingIndex >= 0)
+        {
+            _allCharacters[existingIndex] = updatedEntry;
+        }
+        else
+        {
+            _allCharacters.Add(updatedEntry);
+        }
+
+        _allCharacters = _allCharacters
+            .OrderBy(character => character.Name, StringComparer.CurrentCultureIgnoreCase)
+            .ToList();
+
+        _characterNames = _allCharacters
+            .Select(character => character.Name)
+            .ToList();
+
+        _speciesValues = _allCharacters
+            .Select(character => character.Species)
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(value => value, StringComparer.CurrentCultureIgnoreCase)
+            .ToList();
+
+        _voiceModelFilterValues = _allCharacters
+            .Select(character => character.VoiceModel)
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(value => value, StringComparer.CurrentCultureIgnoreCase)
+            .ToList();
+
+        _raceValues = _allCharacters
+            .Select(character => character.Race)
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(value => value, StringComparer.CurrentCultureIgnoreCase)
+            .ToList();
+
+        RefreshFilterDropdownValues();
     }
 
     private static string GetComboBoxDisplayValue(ComboBox comboBox)
@@ -1249,11 +1476,21 @@ public partial class MainWindow : Window
             return item.Content?.ToString() ?? string.Empty;
         }
 
-        return comboBox.SelectedItem?.ToString() ?? string.Empty;
+        if (comboBox.SelectedItem is not null)
+        {
+            return comboBox.SelectedItem.ToString() ?? string.Empty;
+        }
+
+        return comboBox.IsEditable ? comboBox.Text.Trim() : string.Empty;
     }
 
     private void FieldControl_Changed(object sender, RoutedEventArgs e)
     {
+        if (ReferenceEquals(sender, VoiceModelComboBox))
+        {
+            UpdateVoiceModelValidationState();
+        }
+
         if (_isLoadingFields)
         {
             return;
@@ -1301,11 +1538,28 @@ public partial class MainWindow : Window
     {
         return new CharacterFormData(
             CharacterNameTextBox.Text.Trim(),
-            VoiceModelComboBox.SelectedItem?.ToString() ?? string.Empty,
+            GetComboBoxDisplayValue(VoiceModelComboBox),
             GetComboBoxDisplayValue(GenderComboBox),
             SpeciesComboBox.SelectedItem?.ToString() ?? string.Empty,
             RaceComboBox.SelectedItem?.ToString() ?? string.Empty,
             BioTextBox.Text);
+    }
+
+    private void VoiceModelComboBox_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        if (!ReferenceEquals(sender, VoiceModelComboBox))
+        {
+            return;
+        }
+
+        UpdateVoiceModelValidationState();
+
+        if (_isLoadingFields)
+        {
+            return;
+        }
+
+        SetDirtyState(!CaptureCurrentFormState().Equals(_lastSavedOrLoadedState));
     }
 
     private void SetDirtyState(bool isDirty)
@@ -1450,7 +1704,8 @@ public partial class MainWindow : Window
         _isLoadingFields = true;
         CharacterNameTextBox.Text = string.Empty;
         BioTextBox.Text = string.Empty;
-        VoiceModelComboBox.SelectedIndex = VoiceModelComboBox.Items.Count > 0 ? 0 : -1;
+        VoiceModelComboBox.SelectedItem = null;
+        VoiceModelComboBox.Text = string.Empty;
         GenderComboBox.SelectedIndex = -1;
         SpeciesComboBox.SelectedIndex = -1;
         RaceComboBox.SelectedIndex = -1;
@@ -1461,8 +1716,10 @@ public partial class MainWindow : Window
         _isProgrammaticCharacterSelection = false;
 
         _selectedCharacterName = null;
+        SetDisplayedValueSource(DisplayedValueSource.None);
         _lastSavedOrLoadedState = CaptureCurrentFormState();
         UpdateLoadExistingOverrideButtonState();
+        UpdateVoiceModelValidationState();
         SetDirtyState(false);
     }
 
@@ -1473,42 +1730,34 @@ public partial class MainWindow : Window
             return;
         }
 
-        var overridePath = BuildCharacterOverrideFilePath(_selectedCharacterName);
-        if (string.IsNullOrWhiteSpace(overridePath) || !File.Exists(overridePath))
+        var characterName = string.IsNullOrWhiteSpace(_selectedCharacterName)
+            ? CharacterNameTextBox.Text.Trim()
+            : _selectedCharacterName;
+
+        if (string.IsNullOrWhiteSpace(characterName))
         {
-            UpdateLoadExistingOverrideButtonState();
             return;
         }
 
-        CharacterJsonPayload? payload;
-        try
+        if (!TryGetCsvCharacterEntry(characterName, out var csvEntry))
         {
-            var json = File.ReadAllText(overridePath);
-            payload = JsonSerializer.Deserialize<CharacterJsonPayload>(json);
-        }
-        catch
-        {
-            MessageBox.Show(this, "Unable to load the existing override file.", "Load failed", MessageBoxButton.OK, MessageBoxImage.Warning);
-            return;
-        }
-
-        if (payload is null)
-        {
-            MessageBox.Show(this, "Unable to load the existing override file.", "Load failed", MessageBoxButton.OK, MessageBoxImage.Warning);
+            MessageBox.Show(this, "No default CSV entry exists for this character.", "Load default", MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }
 
         _isLoadingFields = true;
-        CharacterNameTextBox.Text = payload.Name;
-        BioTextBox.Text = payload.Bio;
-        SetComboValue(VoiceModelComboBox, payload.VoiceModel);
-        SetComboValue(GenderComboBox, payload.Gender);
-        SetComboValue(SpeciesComboBox, payload.Species);
-        SetComboValue(RaceComboBox, payload.Race);
+        CharacterNameTextBox.Text = csvEntry.Name;
+        BioTextBox.Text = csvEntry.Bio;
+        SetComboValue(VoiceModelComboBox, csvEntry.VoiceModel);
+        SetComboValue(GenderComboBox, csvEntry.Gender);
+        SetComboValue(SpeciesComboBox, csvEntry.Species);
+        SetComboValue(RaceComboBox, csvEntry.Race);
         _isLoadingFields = false;
 
-        _lastSavedOrLoadedState = CaptureCurrentFormState();
-        SetDirtyState(false);
+        _selectedCharacterName = characterName;
+        SetDisplayedValueSource(DisplayedValueSource.Default);
+        UpdateVoiceModelValidationState();
+        SetDirtyState(!CaptureCurrentFormState().Equals(_lastSavedOrLoadedState));
     }
 
     private readonly record struct CharacterFormData(
@@ -1528,7 +1777,8 @@ public partial class MainWindow : Window
         string Bio,
         string Race,
         string Gender,
-        string Species);
+        string Species,
+        bool HasOverride);
 
     private readonly record struct VoiceModelCandidate(
         string NormalizedForContains,
@@ -1568,6 +1818,13 @@ public partial class MainWindow : Window
     {
         XvaSynth,
         XTts
+    }
+
+    private enum DisplayedValueSource
+    {
+        None,
+        Override,
+        Default
     }
 
     private sealed class CharacterJsonPayload

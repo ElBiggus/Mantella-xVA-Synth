@@ -247,7 +247,32 @@
                     <TextBox x:Name="CharacterNameTextBox" Grid.Row="0" Grid.Column="1" Margin="0,0,0,8" TextChanged="FieldControl_Changed" />
 
                     <TextBlock Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" Margin="0,0,6,8" Text="Voice model" />
-                    <ComboBox x:Name="VoiceModelComboBox" Grid.Row="1" Grid.Column="1" Margin="0,0,0,8" SelectionChanged="FieldControl_Changed" />
+                    <Grid Grid.Row="1" Grid.Column="1" Margin="0,0,0,8">
+                        <ComboBox x:Name="VoiceModelComboBox"
+                                  IsEditable="True"
+                                  SelectionChanged="FieldControl_Changed"
+                                  LostFocus="FieldControl_Changed" />
+                        <TextBlock Text="Type or select a voice model"
+                                   Margin="8,0,0,0"
+                                   VerticalAlignment="Center"
+                                   Foreground="Gray"
+                                   IsHitTestVisible="False"
+                                   Visibility="Collapsed">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding ElementName=VoiceModelComboBox, Path=Text}" Value="">
+                                            <Setter Property="Visibility" Value="Visible" />
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding ElementName=VoiceModelComboBox, Path=IsKeyboardFocusWithin}" Value="True">
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+                    </Grid>
 
                     <TextBlock Grid.Row="2" Grid.Column="0" VerticalAlignment="Center" Margin="0,0,6,8" Text="Gender" />
                     <ComboBox x:Name="GenderComboBox" Grid.Row="2" Grid.Column="1" Margin="0,0,0,8" SelectionChanged="FieldControl_Changed">
@@ -277,12 +302,16 @@
                         Margin="0,12,0,0"
                         Orientation="Horizontal"
                         HorizontalAlignment="Right">
+                    <TextBlock x:Name="DisplayedValueSourceTextBlock"
+                        Margin="0,0,12,0"
+                        VerticalAlignment="Center"
+                        FontWeight="SemiBold"
+                        Text="" />
                     <Button x:Name="LoadExistingOverrideButton"
                         Width="170"
                         Height="34"
                         Margin="0,0,10,0"
-                        Content="Load existing override"
-                        IsEnabled="False"
+                        Content="Load default"
                         Click="LoadExistingOverrideButton_Click" />
                     <Button x:Name="SaveButton"
                         Width="110"

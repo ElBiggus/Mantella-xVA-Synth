@@ -67,7 +67,7 @@ namespace MantellaXvaCharacterEditor {
                 return;
             }
             _contentLoaded = true;
-            System.Uri resourceLocater = new System.Uri("/MantellaXvaCharacterEditor;V0.2.1.0;component/voicemodelfixpreviewdialog.xaml", System.UriKind.Relative);
+            System.Uri resourceLocater = new System.Uri("/MantellaXvaCharacterEditor;V0.3.0.0;component/voicemodelfixpreviewdialog.xaml", System.UriKind.Relative);
             
             #line 1 "..\..\..\VoiceModelFixPreviewDialog.xaml"
             System.Windows.Application.LoadComponent(this, resourceLocater);
